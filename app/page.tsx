@@ -138,7 +138,6 @@ export default function VouchSocialPersistent() {
     // 2. Update UI
     setProjects([{...newProj, desc: newProj.description}, ...projects])
     setIsModalOpen(false)
-  }
 
   // Calculate Weighted Reputation Score
   const totalReputation = projects.reduce((acc, p) => {
