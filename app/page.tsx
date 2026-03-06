@@ -239,7 +239,8 @@ export default function VouchSocialPersistent() {
             <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 0.5 }} className="mt-16 flex flex-col items-center space-y-8 text-center">
                <Fingerprint size={36} className="text-gray-700 animate-pulse" />
                <p className="text-[10px] font-bold text-gray-600 tracking-wide uppercase">
-                 Don't have an account? <br/> <button className="text-cyan-400 underline underline-offset-8 mt-2">Join the Revolution.</button>
+                 {/* FIX: React requires escaped apostrophes */}
+                 Don&apos;t have an account? <br/> <button className="text-cyan-400 underline underline-offset-8 mt-2">Join the Revolution.</button>
                </p>
             </motion.div>
           </div>
