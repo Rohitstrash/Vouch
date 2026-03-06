@@ -89,7 +89,6 @@ export default function VouchSocialPersistent() {
         setProjects([...githubData, ...existingDbProjects])
       }
     } catch (e) { console.error(e) } finally { setIsSyncing(false) }
-  
 
   const handleVouch = async (projectId: string) => {
     if (!user || vouchedIds.includes(projectId)) return
