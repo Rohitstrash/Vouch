@@ -6,7 +6,7 @@ import { motion, AnimatePresence } from 'framer-motion'
 import { 
   Github, LogOut, ExternalLink, Globe, Plus, CheckCircle, 
   RefreshCw, Zap, MapPin, Figma, Linkedin, Gitlab, X, 
-  Edit3, Heart, ShieldCheck, Rocket, User, Lock, Share2, Chrome, Fingerprint 
+  Edit3, Heart, ShieldCheck, Rocket, Share2, Chrome, Fingerprint 
 } from 'lucide-react'
 import { signOut } from './actions'
 
@@ -97,7 +97,7 @@ export default function VouchSocial() {
   return (
     <main className="min-h-screen bg-[#020202] text-white font-sans selection:bg-blue-500/30 overflow-x-hidden">
       {!user ? (
-        /* CYBER-PROTOCOL LOGIN PAGE */
+        /* CLEANED CYBER-PROTOCOL LOGIN PAGE */
         <div className="relative min-h-screen flex items-center justify-center px-6">
           <div className="absolute inset-0 overflow-hidden pointer-events-none">
             <div className="absolute top-[-10%] left-[-10%] w-[600px] h-[600px] bg-cyan-500/20 blur-[150px] rounded-full animate-pulse" />
@@ -110,21 +110,16 @@ export default function VouchSocial() {
                  <Share2 size={64} className="text-cyan-400 drop-shadow-[0_0_15px_rgba(34,211,238,0.5)]" />
                  <div className="absolute inset-0 bg-cyan-400 blur-3xl opacity-20" />
               </div>
-              <h1 className="text-6xl font-black italic tracking-tighter bg-gradient-to-r from-white to-gray-400 bg-clip-text text-transparent">VOUCH</h1>
-              <p className="text-[11px] font-black uppercase tracking-[0.3em] text-cyan-400/80 mt-3">The Anti-Resume. Verify Your Skills.</p>
+              <h1 className="text-6xl font-black italic tracking-tighter bg-gradient-to-r from-white to-gray-400 bg-clip-text text-transparent uppercase">VOUCH</h1>
+              <p className="text-[10px] font-black uppercase tracking-[0.4em] text-cyan-400/80 mt-3 leading-relaxed">The Anti-Resume. <br/> Verify Your Skills.</p>
             </motion.div>
 
-            <motion.div initial={{ scale: 0.9, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} className="w-full bg-white/[0.03] backdrop-blur-2xl border border-white/10 rounded-[3rem] p-10 shadow-2xl space-y-8">
-              <div className="space-y-5">
-                <div className="relative">
-                  <User size={18} className="absolute left-6 top-5 text-gray-500" />
-                  <input disabled className="w-full bg-black/40 border border-white/5 rounded-2xl py-5 pl-16 pr-6 text-sm placeholder:text-gray-600 outline-none" placeholder="Email / Username" />
-                </div>
-                <div className="relative">
-                  <Lock size={18} className="absolute left-6 top-5 text-gray-500" />
-                  <input disabled type="password" className="w-full bg-black/40 border border-white/5 rounded-2xl py-5 pl-16 pr-6 text-sm placeholder:text-gray-600 outline-none" placeholder="Password" />
-                  <button className="absolute right-6 top-5 text-[10px] font-black text-cyan-400 uppercase tracking-widest">Forgot?</button>
-                </div>
+            {/* SIMPLIFIED LOGIN CARD (UNUSABLE INPUTS REMOVED) */}
+            <motion.div initial={{ scale: 0.9, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} className="w-full bg-white/[0.03] backdrop-blur-2xl border border-white/10 rounded-[3rem] p-10 shadow-2xl space-y-10">
+              
+              <div className="text-center space-y-2">
+                 <p className="text-[10px] font-black text-gray-500 uppercase tracking-widest">Protocol Entrance</p>
+                 <h3 className="text-xl font-bold italic uppercase tracking-tighter">Ready for Launch?</h3>
               </div>
 
               <button 
@@ -134,20 +129,22 @@ export default function VouchSocial() {
                 <Rocket size={20} /> Launch (Login)
               </button>
 
-              <div className="text-center space-y-5 pt-4">
-                <span className="text-[10px] font-black text-gray-500 uppercase tracking-widest">Or Continue With:</span>
+              <div className="text-center space-y-6 pt-2">
+                <span className="text-[9px] font-black text-gray-600 uppercase tracking-widest italic flex items-center justify-center gap-2">
+                   <div className="w-8 h-px bg-white/5"/> Or Continue With <div className="w-8 h-px bg-white/5"/>
+                </span>
                 <div className="flex justify-center gap-5">
                   <button onClick={() => handleLogin('github')} className="p-5 bg-white/5 border border-white/10 rounded-2xl hover:bg-white/10 transition-colors"><Github size={22}/></button>
-                  <button className="p-5 bg-white/5 border border-white/10 rounded-2xl hover:bg-white/10 transition-colors opacity-50"><Figma size={22}/></button>
-                  <button className="p-5 bg-white/5 border border-white/10 rounded-2xl hover:bg-white/10 transition-colors opacity-50"><Chrome size={22}/></button>
+                  <button className="p-5 bg-white/5 border border-white/10 rounded-2xl hover:bg-white/10 transition-colors opacity-40"><Figma size={22}/></button>
+                  <button className="p-5 bg-white/5 border border-white/10 rounded-2xl hover:bg-white/10 transition-colors opacity-40"><Chrome size={22}/></button>
                 </div>
               </div>
             </motion.div>
 
-            <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 0.5 }} className="mt-16 flex flex-col items-center space-y-8">
-               <Fingerprint size={36} className="text-gray-600 animate-pulse" />
-               <p className="text-[11px] font-bold text-gray-500 tracking-wide uppercase">
-                 Don't have an account? <button className="text-cyan-400 underline underline-offset-8">Join the Revolution.</button>
+            <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 0.5 }} className="mt-16 flex flex-col items-center space-y-8 text-center">
+               <Fingerprint size={36} className="text-gray-700 animate-pulse" />
+               <p className="text-[10px] font-bold text-gray-600 tracking-wide uppercase">
+                 Don't have an account? <br/> <button className="text-cyan-400 underline underline-offset-8 mt-2">Join the Revolution.</button>
                </p>
             </motion.div>
           </div>
@@ -156,12 +153,12 @@ export default function VouchSocial() {
         /* YOUR PERFECT DASHBOARD (UNTOUCHED) */
         <>
           <nav className="relative z-10 flex justify-between items-center px-10 py-6 border-b border-white/5 backdrop-blur-xl bg-black/40 sticky top-0">
-            <h1 className="text-2xl font-black italic tracking-tighter text-blue-500">VOUCH</h1>
+            <h1 className="text-2xl font-black italic tracking-tighter text-blue-500 uppercase">VOUCH</h1>
             <div className="flex items-center gap-6">
                <button onClick={() => fetchGitHubRepos(user.provider_token)} className="text-gray-500 hover:text-white transition-all">
                  <RefreshCw size={18} className={isSyncing ? "animate-spin" : ""} />
                </button>
-               <form action={signOut}><button className="text-xs font-bold uppercase tracking-widest text-red-500 hover:text-red-400"><LogOut size={16} /></button></form>
+               <form action={signOut}><button className="text-xs font-bold uppercase tracking-widest text-red-500 hover:text-red-400 transition-all"><LogOut size={16} /></button></form>
             </div>
           </nav>
 
@@ -223,6 +220,36 @@ export default function VouchSocial() {
           </div>
         )}
       </AnimatePresence>
+
+      <AnimatePresence>
+        {isModalOpen && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-6">
+            <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} onClick={() => setIsModalOpen(false)} className="absolute inset-0 bg-black/90 backdrop-blur-md" />
+            <motion.div initial={{ scale: 0.9, y: 20 }} animate={{ scale: 1, y: 0 }} className="relative bg-[#0A0A0A] border border-white/10 p-10 rounded-[3rem] w-full max-w-lg shadow-2xl">
+               <h3 className="text-2xl font-black mb-8 italic uppercase tracking-tighter">Add {activePlatform} Proof</h3>
+               <form onSubmit={(e: any) => {
+                 e.preventDefault()
+                 const formData = new FormData(e.target)
+                 const newProj = {
+                   id: Date.now(),
+                   title: formData.get('title'),
+                   tag: formData.get('tag'),
+                   desc: formData.get('desc'),
+                   platform: activePlatform,
+                   vouchCount: 0
+                 }
+                 setProjects([newProj, ...projects])
+                 setIsModalOpen(false)
+               }} className="space-y-6">
+                  <input name="title" required className="w-full bg-white/5 border border-white/10 rounded-2xl px-6 py-4 outline-none focus:border-blue-500" placeholder="Project Title" />
+                  <input name="tag" required className="w-full bg-white/5 border border-white/10 rounded-2xl px-6 py-4 outline-none focus:border-blue-500" placeholder="Category" />
+                  <textarea name="desc" required className="w-full bg-white/5 border border-white/10 rounded-2xl px-6 py-4 outline-none h-32" placeholder="Description" />
+                  <button type="submit" className="w-full bg-blue-600 py-5 rounded-2xl font-black text-xs uppercase tracking-widest">Publish Proof</button>
+               </form>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
     </main>
   )
 }
@@ -236,7 +263,7 @@ function WorkCard({ title, tag, desc, link, platform, vouchCount, onVouch, vouch
         {link && link !== '#' && <a href={link} target="_blank" className="p-2 text-gray-600 hover:text-white transition-colors"><ExternalLink size={18}/></a>}
       </div>
       <p className="text-[10px] font-black uppercase tracking-widest text-blue-500 italic mb-2">{tag}</p>
-      <h4 className="text-2xl font-bold mb-4 italic uppercase tracking-tighter group-hover:text-blue-400 transition-colors">{title}</h4>
+      <h4 className="text-2xl font-bold mb-4 italic uppercase tracking-tighter group-hover:text-blue-400 transition-colors leading-tight">{title}</h4>
       <p className="text-sm text-gray-500 leading-relaxed font-medium line-clamp-3 mb-10">{desc}</p>
       <div className="mt-auto flex items-center justify-between pt-6 border-t border-white/5">
         <div className="flex items-center gap-2">
