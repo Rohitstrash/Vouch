@@ -3,7 +3,7 @@
 import { createBrowserClient } from '@supabase/ssr'
 import { useEffect, useState } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
-import { Github, LogOut, ExternalLink, Box, Palette, Cpu, Plus } from 'lucide-react'
+import { Github, LogOut, ExternalLink, Box, Palette, Cpu, Plus, CheckCircle } from 'lucide-react'
 import { signOut } from './actions'
 
 export default function VouchHighClass() {
@@ -27,9 +27,9 @@ export default function VouchHighClass() {
   if (loading) return (
     <div className="h-screen bg-black flex items-center justify-center">
       <motion.div 
-        animate={{ scale: [1, 1.2, 1], opacity: [0.5, 1, 0.5] }}
-        transition={{ repeat: Infinity, duration: 2 }}
-        className="text-blue-500 font-black text-4xl italic"
+        animate={{ scale: [1, 1.1, 1], opacity: [0.3, 1, 0.3] }}
+        transition={{ repeat: Infinity, duration: 1.5 }}
+        className="text-blue-500 font-black text-5xl italic tracking-tighter"
       >
         VOUCH
       </motion.div>
@@ -37,107 +37,111 @@ export default function VouchHighClass() {
   )
 
   return (
-    <main className="min-h-screen bg-[#050505] text-white selection:bg-blue-500/30">
-      {/* Dynamic Background Gradient */}
+    <main className="min-h-screen bg-[#020202] text-white selection:bg-blue-500/30 overflow-x-hidden">
+      {/* Dynamic Background Accents */}
       <div className="fixed inset-0 overflow-hidden pointer-events-none">
-        <div className="absolute -top-[10%] -left-[10%] w-[40%] h-[40%] bg-blue-900/20 blur-[120px] rounded-full" />
-        <div className="absolute top-[40%] -right-[10%] w-[30%] h-[30%] bg-purple-900/10 blur-[100px] rounded-full" />
+        <div className="absolute top-[-10%] left-[-10%] w-[500px] h-[500px] bg-blue-600/10 blur-[120px] rounded-full" />
+        <div className="absolute bottom-[10%] right-[-5%] w-[400px] h-[400px] bg-purple-600/5 blur-[100px] rounded-full" />
       </div>
 
-      <nav className="relative z-10 flex justify-between items-center p-6 border-b border-white/5 backdrop-blur-md bg-black/20">
+      {/* Navigation */}
+      <nav className="relative z-10 flex justify-between items-center px-8 py-6 border-b border-white/5 backdrop-blur-xl bg-black/40 sticky top-0">
         <h1 className="text-2xl font-black italic tracking-tighter text-blue-500">VOUCH</h1>
         {user && (
-          <form action={signOut}>
-            <button className="flex items-center gap-2 text-xs font-bold uppercase tracking-widest text-gray-500 hover:text-white transition-colors">
+          <form action={signOut} className="flex items-center gap-6">
+            <span className="hidden md:block text-[10px] font-bold text-gray-500 uppercase tracking-widest">Build Protocol v1.0</span>
+            <button className="flex items-center gap-2 text-xs font-bold uppercase tracking-widest text-red-500/80 hover:text-red-400 transition-colors">
               <LogOut size={14} /> Logout
             </button>
           </form>
         )}
       </nav>
 
-      <div className="relative z-10 max-w-5xl mx-auto px-6 py-12">
-        {!user ? (
-          <motion.div 
+      <div className="relative z-10 max-w-6xl mx-auto px-6 py-16">
+        <div className="space-y-16">
+          {/* Profile Header */}
+          <motion.header 
             initial={{ y: 20, opacity: 0 }} 
             animate={{ y: 0, opacity: 1 }}
-            className="flex flex-col items-center text-center py-20"
+            className="flex flex-col md:flex-row md:items-end justify-between gap-8"
           >
-            <h2 className="text-6xl md:text-8xl font-black mb-6 leading-none tracking-tight">
-              PROOF OF <span className="text-blue-500">WORK</span>.
-            </h2>
-            <p className="text-gray-400 max-w-lg text-lg mb-12">
-              The world's first dynamic reputation protocol. Build your legacy, not your resume.
-            </p>
-            <button 
-              onClick={() => supabase.auth.signInWithOAuth({ provider: 'github' })}
-              className="group relative flex items-center gap-3 bg-white text-black px-10 py-5 rounded-full font-bold text-lg hover:scale-105 transition-all active:scale-95"
-            >
-              <Github /> Continue with GitHub
-            </button>
-          </motion.div>
-        ) : (
-          <div className="space-y-12">
-            {/* Profile Header */}
-            <motion.header 
-              initial={{ x: -20, opacity: 0 }} 
-              animate={{ x: 0, opacity: 1 }}
-              className="flex flex-col md:flex-row md:items-end justify-between gap-6"
-            >
-              <div>
-                <p className="text-blue-500 font-mono text-sm mb-2 uppercase tracking-[0.3em]">Verified Builder</p>
-                <h2 className="text-5xl font-black truncate max-w-md">{user.user_metadata.full_name || 'ROHIT SAHA'}</h2>
-                <p className="text-gray-500 mt-2 flex items-center gap-2">
-                  <span className="w-2 h-2 bg-green-500 rounded-full animate-pulse" /> 
-                  Currently building Vouch @ Adobe
-                </p>
+            <div className="space-y-4">
+              <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-blue-500/10 border border-blue-500/20">
+                <CheckCircle size={12} className="text-blue-400" />
+                <span className="text-[10px] font-bold text-blue-400 uppercase tracking-widest">Verified Identity</span>
               </div>
-              <button className="bg-blue-600 hover:bg-blue-500 px-6 py-3 rounded-xl font-bold flex items-center gap-2 transition-all">
-                <Plus size={18} /> New Proof
-              </button>
-            </motion.header>
+              <h2 className="text-6xl font-black tracking-tight leading-none uppercase">
+                {user?.user_metadata?.full_name || 'Rohit Saha'}
+              </h2>
+              <div className="flex items-center gap-4 text-gray-400 font-medium">
+                <span className="flex items-center gap-2 hover:text-white transition-colors cursor-default">
+                  <span className="w-2 h-2 bg-green-500 rounded-full animate-pulse" /> 
+                  Currently Building @ Adobe
+                </span>
+                <span className="w-1 h-1 bg-gray-700 rounded-full" />
+                <span className="hover:text-white transition-colors cursor-default">Navi Mumbai, IN</span>
+              </div>
+            </div>
+            
+            <button className="bg-white text-black px-8 py-4 rounded-2xl font-black text-sm uppercase tracking-widest hover:bg-blue-500 hover:text-white transition-all transform active:scale-95 shadow-xl shadow-white/5">
+              <Plus size={18} className="inline mr-2" /> Create Proof
+            </button>
+          </motion.header>
 
-            {/* Proof of Work Grid */}
+          {/* Proof of Work Grid */}
+          <section className="space-y-8">
+            <h3 className="text-xs font-bold text-gray-500 uppercase tracking-[0.4em]">Active Reputations</h3>
             <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
               <WorkCard 
                 icon={<Cpu className="text-blue-400" />} 
                 title="Obstacle Avoiding Robot" 
                 tag="Robotics" 
-                desc="Arduino-powered autonomous bot with ultrasonic sensors." 
+                status="Verified"
+                desc="Autonomous navigation system built with Arduino, ultrasonic sensors, and L298N driver." 
               />
               <WorkCard 
                 icon={<Palette className="text-purple-400" />} 
-                title="Watercolor Series" 
-                tag="Art" 
-                desc="Experimental wet-on-wet watercolor landscapes." 
+                title="Watercolor Collection" 
+                tag="Fine Art" 
+                status="Live"
+                desc="Exploring atmospheric perspective and wet-on-wet techniques in landscape painting." 
               />
               <WorkCard 
                 icon={<Box className="text-green-400" />} 
                 title="Vouch Protocol" 
-                tag="Software" 
-                desc="Next.js + Supabase Proof-of-Work ecosystem." 
+                tag="Web3/SaaS" 
+                status="In Progress"
+                desc="Redefining the resume with a decentralized, proof-based reputation ecosystem." 
               />
             </div>
-          </div>
-        )}
+          </section>
+        </div>
       </div>
     </main>
   )
 }
 
-function WorkCard({ icon, title, tag, desc }: any) {
+function WorkCard({ icon, title, tag, desc, status }: any) {
   return (
     <motion.div 
-      whileHover={{ y: -10 }}
-      className="bg-white/5 border border-white/10 p-6 rounded-3xl backdrop-blur-sm group cursor-pointer hover:border-blue-500/50 transition-all"
+      whileHover={{ y: -8, backgroundColor: "rgba(255, 255, 255, 0.05)" }}
+      className="bg-white/[0.03] border border-white/10 p-8 rounded-[2rem] backdrop-blur-md group relative overflow-hidden transition-all duration-300 hover:border-blue-500/30"
     >
-      <div className="mb-4 p-3 bg-white/5 w-fit rounded-2xl group-hover:bg-blue-500/10 transition-colors">
-        {icon}
+      <div className="relative z-10">
+        <div className="mb-6 p-4 bg-white/5 w-fit rounded-2xl group-hover:bg-blue-500/20 transition-colors duration-300">
+          {icon}
+        </div>
+        <div className="flex justify-between items-start mb-2">
+          <p className="text-[10px] font-bold uppercase tracking-widest text-blue-500/80">{tag}</p>
+          <span className="text-[10px] font-bold text-gray-500 uppercase">{status}</span>
+        </div>
+        <h3 className="text-2xl font-bold mb-4 flex items-center justify-between group-hover:text-blue-400 transition-colors">
+          {title} <ExternalLink size={18} className="opacity-0 group-hover:opacity-100 transition-all transform translate-y-1 group-hover:translate-y-0" />
+        </h3>
+        <p className="text-sm text-gray-400 leading-relaxed font-medium">{desc}</p>
       </div>
-      <p className="text-[10px] font-bold uppercase tracking-widest text-gray-500 mb-1">{tag}</p>
-      <h3 className="text-xl font-bold mb-2 flex items-center justify-between">
-        {title} <ExternalLink size={16} className="opacity-0 group-hover:opacity-100 transition-opacity" />
-      </h3>
-      <p className="text-sm text-gray-400 leading-relaxed">{desc}</p>
+      {/* Decorative gradient inside card */}
+      <div className="absolute top-0 right-0 w-32 h-32 bg-blue-500/5 blur-3xl rounded-full opacity-0 group-hover:opacity-100 transition-opacity" />
     </motion.div>
   )
 }
