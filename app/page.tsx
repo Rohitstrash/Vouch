@@ -78,7 +78,6 @@ export default function VouchSocialPersistent() {
   const fetchGitHubRepos = async (authIdentifier: string, existingDbProjects: any[], isToken: boolean) => {
     setIsSyncing(true)
     try {
-      // Determine URL and Headers based on whether we have a token or just a username
       const url = isToken 
         ? 'https://api.github.com/user/repos?sort=updated&per_page=6' 
         : `https://api.github.com/users/${authIdentifier}/repos?sort=updated&per_page=6`
@@ -87,7 +86,6 @@ export default function VouchSocialPersistent() {
 
       const res = await fetch(url, { headers })
       
-      // Safety net: If GitHub rate limits us, don't crash, just show existing DB projects
       if (!res.ok) {
         console.error("GitHub API Error:", res.statusText)
         setProjects(existingDbProjects)
@@ -106,7 +104,6 @@ export default function VouchSocialPersistent() {
           difficulty_weight: 1 
         }))
         
-        // Prevent duplicates between GitHub and DB
         const existingIds = new Set(existingDbProjects.map(p => p.id))
         const uniqueGithubData = githubData.filter(repo => !existingIds.has(repo.id))
         
@@ -239,7 +236,7 @@ export default function VouchSocialPersistent() {
             <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 0.5 }} className="mt-16 flex flex-col items-center space-y-8 text-center">
                <Fingerprint size={36} className="text-gray-700 animate-pulse" />
                <p className="text-[10px] font-bold text-gray-600 tracking-wide uppercase">
-                 {/* FIX: React requires escaped apostrophes */}
+                 {/* FIX: Escaped apostrophe here to clear the Vercel Build Error */}
                  Don&apos;t have an account? <br/> <button className="text-cyan-400 underline underline-offset-8 mt-2">Join the Revolution.</button>
                </p>
             </motion.div>
