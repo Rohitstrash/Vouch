@@ -89,6 +89,7 @@ export default function VouchSocialPersistent() {
         setProjects([...githubData, ...existingDbProjects])
       }
     } catch (e) { console.error(e) } finally { setIsSyncing(false) }
+  } // <-- FIXED: Added missing closing brace here
 
   const handleVouch = async (projectId: string) => {
     if (!user || vouchedIds.includes(projectId)) return
@@ -137,7 +138,7 @@ export default function VouchSocialPersistent() {
     // 2. Update UI
     setProjects([{...newProj, desc: newProj.description}, ...projects])
     setIsModalOpen(false)
-  )
+  } // <-- FIXED: Changed from ')' to '}'
 
   // Calculate Weighted Reputation Score
   const totalReputation = projects.reduce((acc, p) => {
@@ -145,19 +146,20 @@ export default function VouchSocialPersistent() {
     return acc + (count * (p.difficulty_weight || 1))
   }, 0)
 
-   const handleLogin = (provider: 'github' | 'google' = 'github') => {
+  const handleLogin = (provider: 'github' | 'google' = 'github') => {
     supabase.auth.signInWithOAuth({ 
       provider, 
       options: { 
         redirectTo: `${window.location.origin}/auth/callback`,
-        // THIS IS THE SECRET SAUCE: It asks GitHub for repo access
         scopes: provider === 'github' ? 'repo read:user' : undefined,
         queryParams: {
           access_type: 'offline',
-          prompt: 'consent', // Forces GitHub to issue a fresh token
+          prompt: 'consent',
         }
       } 
     })
+  } // <-- FIXED: Added missing closing brace here
+
   if (loading) return (
     <div className="h-screen bg-black flex items-center justify-center font-black text-blue-500 text-5xl italic animate-pulse">VOUCH</div>
   )
