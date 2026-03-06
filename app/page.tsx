@@ -31,20 +31,25 @@ export default function VouchSecureSocial() {
 
   useEffect(() => {
     async function getUserData() {
-      const { data: { session } } = await supabase.auth.getSession()
-      if (session) {
-        setUser(session.user)
-        setDisplayName(session.user.user_metadata.full_name || session.user.user_metadata.user_name)
+      try {
+        const { data: { session }, error } = await supabase.auth.getSession()
+        if (error) throw error;
         
-        // Load existing vouches from local storage for this specific user
-        const savedVouches = localStorage.getItem(`vouch_lock_${session.user.id}`)
-        if (savedVouches) setVouchedProjectIds(JSON.parse(savedVouches))
-        
-        if (session.provider_token) fetchGitHubRepos(session.provider_token)
+        if (session) {
+          setUser(session.user)
+          if (session.provider_token) fetchGitHubRepos(session.provider_token)
+        }
+      } catch (e) {
+        console.error("Auth initialization failed", e)
+      } finally {
+        setLoading(false)
       }
-      setLoading(false)
     }
+
     getUserData()
+
+    const timer = setTimeout(() => setLoading(false), 5000)
+    return () => clearTimeout(timer)
   }, [supabase])
 
   const fetchGitHubRepos = async (token: string) => {
