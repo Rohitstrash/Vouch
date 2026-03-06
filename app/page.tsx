@@ -146,10 +146,19 @@ export default function VouchSocialPersistent() {
     return acc + (count * (p.difficulty_weight || 1))
   }, 0)
 
-  const handleLogin = (provider: 'github' | 'google' = 'github') => {
-    supabase.auth.signInWithOAuth({ provider, options: { redirectTo: `${window.location.origin}/auth/callback` } })
-  }
-
+   const handleLogin = (provider: 'github' | 'google' = 'github') => {
+    supabase.auth.signInWithOAuth({ 
+      provider, 
+      options: { 
+        redirectTo: `${window.location.origin}/auth/callback`,
+        // THIS IS THE SECRET SAUCE: It asks GitHub for repo access
+        scopes: provider === 'github' ? 'repo read:user' : undefined,
+        queryParams: {
+          access_type: 'offline',
+          prompt: 'consent', // Forces GitHub to issue a fresh token
+        }
+      } 
+    })
   if (loading) return (
     <div className="h-screen bg-black flex items-center justify-center font-black text-blue-500 text-5xl italic animate-pulse">VOUCH</div>
   )
