@@ -34,7 +34,7 @@ export default function VouchSocialPersistent() {
     process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
   )
 
-  useEffect(() => {
+    useEffect(() => {
     async function initializeProtocol() {
       const { data: { session } } = await supabase.auth.getSession()
       
@@ -58,8 +58,14 @@ export default function VouchSocialPersistent() {
         // 3. Fetch Manual Projects from DB
         const { data: dbProjects } = await supabase.from('projects').select('*').eq('user_id', session.user.id)
         
-        if (session.provider_token) {
-          await fetchGitHubRepos(session.provider_token, dbProjects || [])
+        // --- BULLETPROOF HYBRID SYNC ---
+        const token = session.provider_token
+        const githubUsername = session.user.user_metadata?.preferred_username || session.user.user_metadata?.user_name
+        
+        if (token) {
+          await fetchGitHubRepos(token, dbProjects || [], true)
+        } else if (githubUsername) {
+          await fetchGitHubRepos(githubUsername, dbProjects || [], false)
         } else if (dbProjects) {
           setProjects(dbProjects)
         }
@@ -69,12 +75,25 @@ export default function VouchSocialPersistent() {
     initializeProtocol()
   }, [])
 
-  const fetchGitHubRepos = async (token: string, existingDbProjects: any[]) => {
+  const fetchGitHubRepos = async (authIdentifier: string, existingDbProjects: any[], isToken: boolean) => {
     setIsSyncing(true)
     try {
-      const res = await fetch('https://api.github.com/user/repos?sort=updated&per_page=6', {
-        headers: { Authorization: `Bearer ${token}` }
-      })
+      // Determine URL and Headers based on whether we have a token or just a username
+      const url = isToken 
+        ? 'https://api.github.com/user/repos?sort=updated&per_page=6' 
+        : `https://api.github.com/users/${authIdentifier}/repos?sort=updated&per_page=6`
+      
+      const headers = isToken ? { Authorization: `Bearer ${authIdentifier}` } : {}
+
+      const res = await fetch(url, { headers })
+      
+      // Safety net: If GitHub rate limits us, don't crash, just show existing DB projects
+      if (!res.ok) {
+        console.error("GitHub API Error:", res.statusText)
+        setProjects(existingDbProjects)
+        return
+      }
+
       const data = await res.json()
       if (Array.isArray(data)) {
         const githubData = data.map(repo => ({
@@ -86,10 +105,21 @@ export default function VouchSocialPersistent() {
           link: repo.html_url,
           difficulty_weight: 1 
         }))
-        setProjects([...githubData, ...existingDbProjects])
+        
+        // Prevent duplicates between GitHub and DB
+        const existingIds = new Set(existingDbProjects.map(p => p.id))
+        const uniqueGithubData = githubData.filter(repo => !existingIds.has(repo.id))
+        
+        setProjects([...uniqueGithubData, ...existingDbProjects])
       }
-    } catch (e) { console.error(e) } finally { setIsSyncing(false) }
-  } // <-- FIXED: Added missing closing brace here
+    } catch (e) { 
+      console.error(e) 
+      setProjects(existingDbProjects)
+    } finally { 
+      setIsSyncing(false) 
+    }
+  }
+ // <-- FIXED: Added missing closing brace here
 
   const handleVouch = async (projectId: string) => {
     if (!user || vouchedIds.includes(projectId)) return
@@ -221,9 +251,10 @@ export default function VouchSocialPersistent() {
           <nav className="relative z-10 flex justify-between items-center px-10 py-6 border-b border-white/5 backdrop-blur-xl bg-black/40 sticky top-0">
             <h1 className="text-2xl font-black italic tracking-tighter text-blue-500 uppercase">VOUCH</h1>
             <div className="flex items-center gap-6">
-               <button onClick={() => fetchGitHubRepos(user.provider_token, projects)} className="text-gray-500 hover:text-white transition-all">
+                              <button onClick={() => fetchGitHubRepos(user.provider_token || user.user_metadata?.preferred_username || user.user_metadata?.user_name, projects, !!user.provider_token)} className="text-gray-500 hover:text-white transition-all">
                  <RefreshCw size={18} className={isSyncing ? "animate-spin" : ""} />
                </button>
+
                <form action={signOut}><button className="text-xs font-bold uppercase tracking-widest text-red-500 hover:text-red-400 transition-all"><LogOut size={16} /></button></form>
             </div>
           </nav>
