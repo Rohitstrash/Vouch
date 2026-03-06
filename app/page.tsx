@@ -34,7 +34,7 @@ export default function VouchSocialPersistent() {
     process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
   )
 
-    useEffect(() => {
+  useEffect(() => {
     async function initializeProtocol() {
       const { data: { session } } = await supabase.auth.getSession()
       
@@ -119,7 +119,6 @@ export default function VouchSocialPersistent() {
       setIsSyncing(false) 
     }
   }
- // <-- FIXED: Added missing closing brace here
 
   const handleVouch = async (projectId: string) => {
     if (!user || vouchedIds.includes(projectId)) return
@@ -168,7 +167,7 @@ export default function VouchSocialPersistent() {
     // 2. Update UI
     setProjects([{...newProj, desc: newProj.description}, ...projects])
     setIsModalOpen(false)
-  } // <-- FIXED: Changed from ')' to '}'
+  }
 
   // Calculate Weighted Reputation Score
   const totalReputation = projects.reduce((acc, p) => {
@@ -188,7 +187,7 @@ export default function VouchSocialPersistent() {
         }
       } 
     })
-  } // <-- FIXED: Added missing closing brace here
+  }
 
   if (loading) return (
     <div className="h-screen bg-black flex items-center justify-center font-black text-blue-500 text-5xl italic animate-pulse">VOUCH</div>
@@ -251,10 +250,9 @@ export default function VouchSocialPersistent() {
           <nav className="relative z-10 flex justify-between items-center px-10 py-6 border-b border-white/5 backdrop-blur-xl bg-black/40 sticky top-0">
             <h1 className="text-2xl font-black italic tracking-tighter text-blue-500 uppercase">VOUCH</h1>
             <div className="flex items-center gap-6">
-                              <button onClick={() => fetchGitHubRepos(user.provider_token || user.user_metadata?.preferred_username || user.user_metadata?.user_name, projects, !!user.provider_token)} className="text-gray-500 hover:text-white transition-all">
+               <button onClick={() => fetchGitHubRepos(user.provider_token || user.user_metadata?.preferred_username || user.user_metadata?.user_name, projects, !!user.provider_token)} className="text-gray-500 hover:text-white transition-all">
                  <RefreshCw size={18} className={isSyncing ? "animate-spin" : ""} />
                </button>
-
                <form action={signOut}><button className="text-xs font-bold uppercase tracking-widest text-red-500 hover:text-red-400 transition-all"><LogOut size={16} /></button></form>
             </div>
           </nav>
