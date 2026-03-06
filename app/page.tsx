@@ -38,7 +38,7 @@ export default function VouchSocialPersistent() {
     async function initializeProtocol() {
       const { data: { session } } = await supabase.auth.getSession()
       
-      // 1. Fetch Global Vouch Counts (How many vouches each project has total)
+      // 1. Fetch Global Vouch Counts
       const { data: allVouches } = await supabase.from('vouches').select('project_id')
       if (allVouches) {
         const counts: Record<string, number> = {}
@@ -51,7 +51,7 @@ export default function VouchSocialPersistent() {
         setDisplayName(session.user.user_metadata?.full_name || session.user.user_metadata?.user_name || 'New Builder')
         setDisplayBio(session.user.user_metadata?.bio || 'Building the future of reputation.')
         
-        // 2. Fetch What THIS User Has Vouched For (To disable the buttons)
+        // 2. Fetch What THIS User Has Vouched For
         const { data: myVouches } = await supabase.from('vouches').select('project_id').eq('voucher_id', session.user.id)
         if (myVouches) setVouchedIds(myVouches.map(v => v.project_id))
 
@@ -78,13 +78,13 @@ export default function VouchSocialPersistent() {
       const data = await res.json()
       if (Array.isArray(data)) {
         const githubData = data.map(repo => ({
-          id: repo.id.toString(), // Converted to string for DB matching
+          id: repo.id.toString(),
           platform: 'github',
           title: repo.name,
           tag: repo.language || 'Protocol',
           desc: repo.description || 'Verified via GitHub Sync',
           link: repo.html_url,
-          difficulty_weight: 1 // Default for GitHub
+          difficulty_weight: 1 
         }))
         setProjects([...githubData, ...existingDbProjects])
       }
@@ -94,7 +94,7 @@ export default function VouchSocialPersistent() {
   const handleVouch = async (projectId: string) => {
     if (!user || vouchedIds.includes(projectId)) return
 
-    // 1. Optimistic UI Update (Instant feedback)
+    // 1. Optimistic UI Update
     setVouchedIds(prev => [...prev, projectId])
     setGlobalVouchCounts(prev => ({ ...prev, [projectId]: (prev[projectId] || 0) + 1 }))
 
@@ -157,7 +157,7 @@ export default function VouchSocialPersistent() {
   return (
     <main className="min-h-screen bg-[#020202] text-white font-sans selection:bg-blue-500/30 overflow-x-hidden">
       {!user ? (
-        /* CYBER-PROTOCOL LOGIN PAGE (UNTOUCHED UI) */
+        /* CYBER-PROTOCOL LOGIN PAGE */
         <div className="relative min-h-screen flex items-center justify-center px-6">
           <div className="absolute inset-0 overflow-hidden pointer-events-none">
             <div className="absolute top-[-10%] left-[-10%] w-[600px] h-[600px] bg-cyan-500/20 blur-[150px] rounded-full animate-pulse" />
@@ -206,7 +206,7 @@ export default function VouchSocialPersistent() {
           </div>
         </div>
       ) : (
-        /* PERFECT DASHBOARD (UNTOUCHED UI) */
+        /* DASHBOARD */
         <>
           <nav className="relative z-10 flex justify-between items-center px-10 py-6 border-b border-white/5 backdrop-blur-xl bg-black/40 sticky top-0">
             <h1 className="text-2xl font-black italic tracking-tighter text-blue-500 uppercase">VOUCH</h1>
@@ -238,10 +238,21 @@ export default function VouchSocialPersistent() {
                 <button onClick={() => setIsModalOpen(true)} className="bg-white text-black px-10 py-5 rounded-2xl font-black text-xs uppercase tracking-widest flex items-center gap-2 hover:bg-blue-600 transition-all shadow-xl shadow-white/5"><Plus size={16} /> New Proof</button>
               </motion.header>
 
-              <div className="flex gap-8 border-b border-white/5 overflow-x-auto no-scrollbar">
-                {(['github', 'figma', 'linkedin', 'gitlab'] as Platform[]).map((p) => (
-                  <button key={p} onClick={() => setActivePlatform(p)} className={`pb-4 text-[11px] font-black uppercase tracking-[0.2em] transition-all ${activePlatform === p ? 'text-white border-b-2 border-white' : 'text-gray-600 hover:text-gray-400'}`}>{p}</button>
-                ))}
+              {/* TABS WITH DYNAMIC ICONS */}
+              <div className="flex gap-8 border-b border-white/5 overflow-x-auto no-scrollbar pb-2">
+                {(['github', 'figma', 'linkedin', 'gitlab'] as Platform[]).map((p) => {
+                  const TabIcon = p === 'github' ? Github : p === 'figma' ? Figma : p === 'linkedin' ? Linkedin : Gitlab;
+                  return (
+                    <button 
+                      key={p} 
+                      onClick={() => setActivePlatform(p)} 
+                      className={`pb-4 text-[11px] font-black uppercase tracking-[0.2em] transition-all flex items-center gap-2 ${activePlatform === p ? 'text-white border-b-2 border-white' : 'text-gray-600 hover:text-gray-400'}`}
+                    >
+                      <TabIcon size={14} />
+                      {p}
+                    </button>
+                  )
+                })}
               </div>
 
               <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
@@ -295,7 +306,6 @@ export default function VouchSocialPersistent() {
                   <input name="tag" required className="w-full bg-white/5 border border-white/10 rounded-2xl px-6 py-4 outline-none focus:border-blue-500" placeholder="Category" />
                   <textarea name="desc" required className="w-full bg-white/5 border border-white/10 rounded-2xl px-6 py-4 outline-none h-32" placeholder="Description" />
                   
-                  {/* DIFFICULTY MULTIPLIER ADDED HERE */}
                   <select name="difficulty" className="w-full bg-white/5 border border-white/10 rounded-2xl px-6 py-4 outline-none focus:border-blue-500 appearance-none text-gray-400">
                     <option value="1">Difficulty: Standard (1x Rep)</option>
                     <option value="2">Difficulty: Advanced (2x Rep)</option>
