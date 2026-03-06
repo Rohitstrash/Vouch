@@ -11,9 +11,7 @@ export default function VouchDashboard() {
   const [loading, setLoading] = useState(true)
   const [isModalOpen, setIsModalOpen] = useState(false)
   const [projects, setProjects] = useState([
-    { id: 1, title: "Obstacle Avoiding Bot", tag: "Robotics", status: "Verified", desc: "Arduino-powered autonomous navigation system.", icon: <Cpu className="text-blue-400" /> },
-    { id: 2, title: "Watercolor Series", tag: "Art", status: "Live", desc: "Exploring atmospheric perspective and wet-on-wet techniques.", icon: <Palette className="text-purple-400" /> }
-  ])
+   ])
 
   const supabase = createBrowserClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
