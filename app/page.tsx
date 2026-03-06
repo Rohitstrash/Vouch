@@ -4,7 +4,7 @@ import { createBrowserClient } from '@supabase/ssr'
 import { useEffect, useState } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { 
-  Github, LogOut, ExternalLink, Globe, Plus, CheckCircle, 
+  Github, LogOut, ExternalLink, Plus, CheckCircle, 
   RefreshCw, Zap, MapPin, Figma, Linkedin, Gitlab, X, 
   Edit3, Heart, ShieldCheck, Rocket, Share2, Chrome, Fingerprint 
 } from 'lucide-react'
@@ -12,7 +12,7 @@ import { signOut } from './actions'
 
 type Platform = 'github' | 'figma' | 'linkedin' | 'gitlab'
 
-export default function VouchSocial() {
+export default function VouchSocialPersistent() {
   const [user, setUser] = useState<any>(null)
   const [loading, setLoading] = useState(true)
   const [isSyncing, setIsSyncing] = useState(false)
@@ -20,10 +20,14 @@ export default function VouchSocial() {
   const [isEditOpen, setIsEditOpen] = useState(false)
   const [activePlatform, setActivePlatform] = useState<Platform>('github')
 
+  // PERSISTED DATA STATES
   const [displayName, setDisplayName] = useState('')
   const [displayBio, setDisplayBio] = useState('Building the future of reputation.')
   const [projects, setProjects] = useState<any[]>([])
-  const [vouchedIds, setVouchedIds] = useState<number[]>([])
+  
+  // DB Tracking States
+  const [vouchedIds, setVouchedIds] = useState<string[]>([]) 
+  const [globalVouchCounts, setGlobalVouchCounts] = useState<Record<string, number>>({})
 
   const supabase = createBrowserClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -31,19 +35,41 @@ export default function VouchSocial() {
   )
 
   useEffect(() => {
-    async function getUser() {
+    async function initializeProtocol() {
       const { data: { session } } = await supabase.auth.getSession()
+      
+      // 1. Fetch Global Vouch Counts (How many vouches each project has total)
+      const { data: allVouches } = await supabase.from('vouches').select('project_id')
+      if (allVouches) {
+        const counts: Record<string, number> = {}
+        allVouches.forEach(v => { counts[v.project_id] = (counts[v.project_id] || 0) + 1 })
+        setGlobalVouchCounts(counts)
+      }
+
       if (session) {
         setUser(session.user)
         setDisplayName(session.user.user_metadata?.full_name || session.user.user_metadata?.user_name || 'New Builder')
-        if (session.provider_token) fetchGitHubRepos(session.provider_token)
+        setDisplayBio(session.user.user_metadata?.bio || 'Building the future of reputation.')
+        
+        // 2. Fetch What THIS User Has Vouched For (To disable the buttons)
+        const { data: myVouches } = await supabase.from('vouches').select('project_id').eq('voucher_id', session.user.id)
+        if (myVouches) setVouchedIds(myVouches.map(v => v.project_id))
+
+        // 3. Fetch Manual Projects from DB
+        const { data: dbProjects } = await supabase.from('projects').select('*').eq('user_id', session.user.id)
+        
+        if (session.provider_token) {
+          await fetchGitHubRepos(session.provider_token, dbProjects || [])
+        } else if (dbProjects) {
+          setProjects(dbProjects)
+        }
       }
       setLoading(false)
     }
-    getUser()
+    initializeProtocol()
   }, [])
 
-  const fetchGitHubRepos = async (token: string) => {
+  const fetchGitHubRepos = async (token: string, existingDbProjects: any[]) => {
     setIsSyncing(true)
     try {
       const res = await fetch('https://api.github.com/user/repos?sort=updated&per_page=6', {
@@ -52,42 +78,76 @@ export default function VouchSocial() {
       const data = await res.json()
       if (Array.isArray(data)) {
         const githubData = data.map(repo => ({
-          id: repo.id,
+          id: repo.id.toString(), // Converted to string for DB matching
           platform: 'github',
           title: repo.name,
           tag: repo.language || 'Protocol',
           desc: repo.description || 'Verified via GitHub Sync',
           link: repo.html_url,
-          vouchCount: Math.floor(Math.random() * 50)
+          difficulty_weight: 1 // Default for GitHub
         }))
-        setProjects(prev => [...githubData, ...prev.filter(p => p.platform !== 'github')])
+        setProjects([...githubData, ...existingDbProjects])
       }
     } catch (e) { console.error(e) } finally { setIsSyncing(false) }
   }
 
-  const handleVouch = (id: number) => {
-    if (vouchedIds.includes(id)) return
-    setVouchedIds(prev => [...prev, id])
-    setProjects(prev => prev.map(p => 
-      p.id === id ? { ...p, vouchCount: (p.vouchCount || 0) + 1 } : p
-    ))
+  const handleVouch = async (projectId: string) => {
+    if (!user || vouchedIds.includes(projectId)) return
+
+    // 1. Optimistic UI Update (Instant feedback)
+    setVouchedIds(prev => [...prev, projectId])
+    setGlobalVouchCounts(prev => ({ ...prev, [projectId]: (prev[projectId] || 0) + 1 }))
+
+    // 2. Save to Supabase (Permanent)
+    await supabase.from('vouches').insert({ project_id: projectId, voucher_id: user.id })
   }
 
-  const totalReputation = projects.reduce((acc, curr) => acc + (curr.vouchCount || 0), 0)
-
-  const handleUpdateProfile = (e: any) => {
+  const handleUpdateProfile = async (e: any) => {
     e.preventDefault()
     const formData = new FormData(e.target)
-    setDisplayName(formData.get('name') as string)
-    setDisplayBio(formData.get('bio') as string)
+    const newName = formData.get('name') as string
+    const newBio = formData.get('bio') as string
+
+    // 1. Instant UI Update
+    setDisplayName(newName)
+    setDisplayBio(newBio)
     setIsEditOpen(false)
+
+    // 2. Permanent Auth Update
+    await supabase.auth.updateUser({ data: { full_name: newName, bio: newBio } })
   }
 
+  const handleAddProof = async (e: any) => {
+    e.preventDefault()
+    const formData = new FormData(e.target)
+    const newId = `manual-${Date.now()}`
+    
+    const newProj = {
+      id: newId,
+      user_id: user.id,
+      title: formData.get('title'),
+      tag: formData.get('tag'),
+      description: formData.get('desc'),
+      platform: activePlatform,
+      difficulty_weight: parseInt(formData.get('difficulty') as string) || 1
+    }
+
+    // 1. Save to DB
+    await supabase.from('projects').insert(newProj)
+
+    // 2. Update UI
+    setProjects([{...newProj, desc: newProj.description}, ...projects])
+    setIsModalOpen(false)
+  }
+
+  // Calculate Weighted Reputation Score
+  const totalReputation = projects.reduce((acc, p) => {
+    const count = globalVouchCounts[p.id] || 0
+    return acc + (count * (p.difficulty_weight || 1))
+  }, 0)
+
   const handleLogin = (provider: 'github' | 'google' = 'github') => {
-    supabase.auth.signInWithOAuth({
-      provider,
-      options: { redirectTo: `${window.location.origin}/auth/callback` }
-    })
+    supabase.auth.signInWithOAuth({ provider, options: { redirectTo: `${window.location.origin}/auth/callback` } })
   }
 
   if (loading) return (
@@ -97,7 +157,7 @@ export default function VouchSocial() {
   return (
     <main className="min-h-screen bg-[#020202] text-white font-sans selection:bg-blue-500/30 overflow-x-hidden">
       {!user ? (
-        /* CLEANED CYBER-PROTOCOL LOGIN PAGE */
+        /* CYBER-PROTOCOL LOGIN PAGE (UNTOUCHED UI) */
         <div className="relative min-h-screen flex items-center justify-center px-6">
           <div className="absolute inset-0 overflow-hidden pointer-events-none">
             <div className="absolute top-[-10%] left-[-10%] w-[600px] h-[600px] bg-cyan-500/20 blur-[150px] rounded-full animate-pulse" />
@@ -114,7 +174,6 @@ export default function VouchSocial() {
               <p className="text-[10px] font-black uppercase tracking-[0.4em] text-cyan-400/80 mt-3 leading-relaxed">The Anti-Resume. <br/> Verify Your Skills.</p>
             </motion.div>
 
-            {/* SIMPLIFIED LOGIN CARD (UNUSABLE INPUTS REMOVED) */}
             <motion.div initial={{ scale: 0.9, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} className="w-full bg-white/[0.03] backdrop-blur-2xl border border-white/10 rounded-[3rem] p-10 shadow-2xl space-y-10">
               
               <div className="text-center space-y-2">
@@ -122,10 +181,7 @@ export default function VouchSocial() {
                  <h3 className="text-xl font-bold italic uppercase tracking-tighter">Ready for Launch?</h3>
               </div>
 
-              <button 
-                onClick={() => handleLogin('github')}
-                className="w-full py-6 rounded-[1.5rem] bg-gradient-to-r from-cyan-400 to-purple-500 text-black font-black text-xs uppercase tracking-widest flex items-center justify-center gap-3 hover:scale-[1.02] active:scale-95 transition-all shadow-xl shadow-cyan-500/20"
-              >
+              <button onClick={() => handleLogin('github')} className="w-full py-6 rounded-[1.5rem] bg-gradient-to-r from-cyan-400 to-purple-500 text-black font-black text-xs uppercase tracking-widest flex items-center justify-center gap-3 hover:scale-[1.02] active:scale-95 transition-all shadow-xl shadow-cyan-500/20">
                 <Rocket size={20} /> Launch (Login)
               </button>
 
@@ -150,12 +206,12 @@ export default function VouchSocial() {
           </div>
         </div>
       ) : (
-        /* YOUR PERFECT DASHBOARD (UNTOUCHED) */
+        /* PERFECT DASHBOARD (UNTOUCHED UI) */
         <>
           <nav className="relative z-10 flex justify-between items-center px-10 py-6 border-b border-white/5 backdrop-blur-xl bg-black/40 sticky top-0">
             <h1 className="text-2xl font-black italic tracking-tighter text-blue-500 uppercase">VOUCH</h1>
             <div className="flex items-center gap-6">
-               <button onClick={() => fetchGitHubRepos(user.provider_token)} className="text-gray-500 hover:text-white transition-all">
+               <button onClick={() => fetchGitHubRepos(user.provider_token, projects)} className="text-gray-500 hover:text-white transition-all">
                  <RefreshCw size={18} className={isSyncing ? "animate-spin" : ""} />
                </button>
                <form action={signOut}><button className="text-xs font-bold uppercase tracking-widest text-red-500 hover:text-red-400 transition-all"><LogOut size={16} /></button></form>
@@ -192,7 +248,13 @@ export default function VouchSocial() {
                 <AnimatePresence mode="popLayout">
                   {projects.filter(p => p.platform === activePlatform).length > 0 ? (
                     projects.filter(p => p.platform === activePlatform).map((proj) => (
-                      <WorkCard key={proj.id} {...proj} onVouch={() => handleVouch(proj.id)} vouched={vouchedIds.includes(proj.id)} />
+                      <WorkCard 
+                        key={proj.id} 
+                        {...proj} 
+                        vouchCount={globalVouchCounts[proj.id] || 0}
+                        vouched={vouchedIds.includes(proj.id)}
+                        onVouch={() => handleVouch(proj.id)} 
+                      />
                     ))
                   ) : (
                     <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="col-span-3 py-24 text-center border-2 border-dashed border-white/5 rounded-[3rem]"><p className="text-gray-600 font-bold uppercase tracking-widest text-xs italic">Awaiting Protocol Sync...</p></motion.div>
@@ -204,7 +266,7 @@ export default function VouchSocial() {
         </>
       )}
 
-      {/* DRAWER & MODAL LOGIC REMAINS THE SAME */}
+      {/* DRAWER: EDIT IDENTITY */}
       <AnimatePresence>
         {isEditOpen && (
           <div className="fixed inset-0 z-50 flex justify-end">
@@ -221,29 +283,25 @@ export default function VouchSocial() {
         )}
       </AnimatePresence>
 
+      {/* MODAL: ADD PROOF */}
       <AnimatePresence>
         {isModalOpen && (
           <div className="fixed inset-0 z-50 flex items-center justify-center p-6">
             <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} onClick={() => setIsModalOpen(false)} className="absolute inset-0 bg-black/90 backdrop-blur-md" />
             <motion.div initial={{ scale: 0.9, y: 20 }} animate={{ scale: 1, y: 0 }} className="relative bg-[#0A0A0A] border border-white/10 p-10 rounded-[3rem] w-full max-w-lg shadow-2xl">
                <h3 className="text-2xl font-black mb-8 italic uppercase tracking-tighter">Add {activePlatform} Proof</h3>
-               <form onSubmit={(e: any) => {
-                 e.preventDefault()
-                 const formData = new FormData(e.target)
-                 const newProj = {
-                   id: Date.now(),
-                   title: formData.get('title'),
-                   tag: formData.get('tag'),
-                   desc: formData.get('desc'),
-                   platform: activePlatform,
-                   vouchCount: 0
-                 }
-                 setProjects([newProj, ...projects])
-                 setIsModalOpen(false)
-               }} className="space-y-6">
+               <form onSubmit={handleAddProof} className="space-y-6">
                   <input name="title" required className="w-full bg-white/5 border border-white/10 rounded-2xl px-6 py-4 outline-none focus:border-blue-500" placeholder="Project Title" />
                   <input name="tag" required className="w-full bg-white/5 border border-white/10 rounded-2xl px-6 py-4 outline-none focus:border-blue-500" placeholder="Category" />
                   <textarea name="desc" required className="w-full bg-white/5 border border-white/10 rounded-2xl px-6 py-4 outline-none h-32" placeholder="Description" />
+                  
+                  {/* DIFFICULTY MULTIPLIER ADDED HERE */}
+                  <select name="difficulty" className="w-full bg-white/5 border border-white/10 rounded-2xl px-6 py-4 outline-none focus:border-blue-500 appearance-none text-gray-400">
+                    <option value="1">Difficulty: Standard (1x Rep)</option>
+                    <option value="2">Difficulty: Advanced (2x Rep)</option>
+                    <option value="5">Difficulty: Masterclass (5x Rep)</option>
+                  </select>
+
                   <button type="submit" className="w-full bg-blue-600 py-5 rounded-2xl font-black text-xs uppercase tracking-widest">Publish Proof</button>
                </form>
             </motion.div>
