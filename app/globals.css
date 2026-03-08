@@ -5,7 +5,6 @@
 @import "./fonts.css";
 
 /* Theme Variables */
-
 @layer base {
   :root {
     --background: 0 0% 100%;
@@ -71,14 +70,16 @@
 }
 
 /* Base Styles */
-
 @layer base {
   * {
-    @apply border-border;
+    /* FIXED: Using standard CSS to read the variable */
+    border-color: hsl(var(--border));
   }
 
   body {
-    @apply bg-background text-foreground;
+    /* FIXED: Using standard CSS instead of unconfigured @apply */
+    background-color: hsl(var(--background));
+    color: hsl(var(--foreground));
   }
 
   html {
