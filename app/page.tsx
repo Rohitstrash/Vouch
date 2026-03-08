@@ -7,14 +7,13 @@ import { useEffect, useState } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { 
   Github, LogOut, ExternalLink, Plus, CheckCircle, 
-  RefreshCw, Zap, MapPin, Figma, Linkedin, Gitlab, X, 
-  Edit3, Heart, ShieldCheck, Rocket, Share2, Chrome, Fingerprint 
+  RefreshCw, Zap, Figma, Linkedin, Gitlab, X, 
+  Edit3, Heart, ShieldCheck, BadgeCheck, ArrowRight 
 } from 'lucide-react'
 import { signOut } from './actions'
 
 type Platform = 'github' | 'figma' | 'linkedin' | 'gitlab'
 
-// Added Interfaces for Safety
 interface ProjectData {
   id: string;
   title: string;
@@ -96,7 +95,6 @@ export default function VouchSocialPersistent() {
       const res = await fetch(url, { headers })
       
       if (!res.ok) {
-        console.error("GitHub API Error:", res.statusText)
         setProjects(existingDbProjects)
         return
       }
@@ -119,7 +117,6 @@ export default function VouchSocialPersistent() {
         setProjects([...uniqueGithubData, ...existingDbProjects])
       }
     } catch (e) { 
-      console.error(e) 
       setProjects(existingDbProjects)
     } finally { 
       setIsSyncing(false) 
@@ -179,66 +176,44 @@ export default function VouchSocialPersistent() {
       options: { 
         redirectTo: `${window.location.origin}/auth/callback`,
         scopes: provider === 'github' ? 'repo read:user' : undefined,
-        queryParams: {
-          access_type: 'offline',
-          prompt: 'consent',
-        }
+        queryParams: { access_type: 'offline', prompt: 'consent' }
       } 
     })
   }
 
   if (loading) return (
-    <div className="h-screen bg-black flex items-center justify-center font-black text-blue-500 text-5xl italic animate-pulse">VOUCH</div>
+    <div className="h-screen bg-[#020202] flex items-center justify-center font-black text-blue-500 text-5xl italic animate-pulse">VOUCH</div>
   )
 
   return (
     <main className="min-h-screen bg-[#020202] text-white font-sans selection:bg-blue-500/30 overflow-x-hidden">
       {!user ? (
-        <div className="relative min-h-screen flex items-center justify-center px-6">
-          <div className="absolute inset-0 overflow-hidden pointer-events-none">
-            <div className="absolute top-[-10%] left-[-10%] w-[600px] h-[600px] bg-cyan-500/20 blur-[150px] rounded-full animate-pulse" />
-            <div className="absolute bottom-[10%] right-[-5%] w-[500px] h-[500px] bg-purple-600/15 blur-[130px] rounded-full animate-pulse" style={{ animationDelay: '2s' }} />
+        /* FIGMA-INJECTED LOGIN SCREEN */
+        <div className="min-h-screen flex flex-col items-center justify-center relative px-4 z-10">
+          <div className="absolute top-8 left-8 flex items-center gap-3 group">
+            <div className="bg-gradient-to-br from-blue-500 to-blue-700 p-2 rounded-xl shadow-[0_0_20px_rgba(59,130,246,0.5)] group-hover:shadow-[0_0_25px_rgba(59,130,246,0.7)] transition-all">
+              <BadgeCheck className="h-5 w-5 text-white" />
+            </div>
+            <span className="font-extrabold text-xl tracking-tighter text-white">VOUCH</span>
           </div>
 
-          <div className="relative z-10 w-full max-w-[420px] py-12 flex flex-col items-center">
-            <motion.div initial={{ y: -20, opacity: 0 }} animate={{ y: 0, opacity: 1 }} className="flex flex-col items-center mb-12 text-center">
-              <div className="relative mb-6">
-                 <Share2 size={64} className="text-cyan-400 drop-shadow-[0_0_15px_rgba(34,211,238,0.5)]" />
-                 <div className="absolute inset-0 bg-cyan-400 blur-3xl opacity-20" />
-              </div>
-              <h1 className="text-6xl font-black italic tracking-tighter bg-gradient-to-r from-white to-gray-400 bg-clip-text text-transparent uppercase">VOUCH</h1>
-              <p className="text-[10px] font-black uppercase tracking-[0.4em] text-cyan-400/80 mt-3 leading-relaxed">The Anti-Resume. <br/> Verify Your Skills.</p>
-            </motion.div>
+          <motion.div 
+            initial={{ opacity: 0, scale: 0.95 }}
+            animate={{ opacity: 1, scale: 1 }}
+            className="w-full max-w-md bg-white/5 backdrop-blur-2xl border border-white/10 rounded-3xl p-8 shadow-[0_8px_32px_rgba(0,0,0,0.4)]"
+          >
+            <div className="text-center mb-10">
+              <h2 className="text-3xl font-extrabold text-white tracking-tight mb-2">Welcome back</h2>
+              <p className="text-gray-400 font-medium text-sm">Log in to continue building your reputation.</p>
+            </div>
 
-            <motion.div initial={{ scale: 0.9, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} className="w-full bg-white/[0.03] backdrop-blur-2xl border border-white/10 rounded-[3rem] p-10 shadow-2xl space-y-10">
-              <div className="text-center space-y-2">
-                 <p className="text-[10px] font-black text-gray-500 uppercase tracking-widest">Protocol Entrance</p>
-                 <h3 className="text-xl font-bold italic uppercase tracking-tighter">Ready for Launch?</h3>
-              </div>
-              <button onClick={() => handleLogin('github')} className="w-full py-6 rounded-[1.5rem] bg-gradient-to-r from-cyan-400 to-purple-500 text-black font-black text-xs uppercase tracking-widest flex items-center justify-center gap-3 hover:scale-[1.02] active:scale-95 transition-all shadow-xl shadow-cyan-500/20">
-                <Rocket size={20} /> Launch (Login)
-              </button>
-              <div className="text-center space-y-6 pt-2">
-                <span className="text-[9px] font-black text-gray-600 uppercase tracking-widest italic flex items-center justify-center gap-2">
-                   <div className="w-8 h-px bg-white/5"/> Or Continue With <div className="w-8 h-px bg-white/5"/>
-                </span>
-                <div className="flex justify-center gap-5">
-                  <button onClick={() => handleLogin('github')} className="p-5 bg-white/5 border border-white/10 rounded-2xl hover:bg-white/10 transition-colors"><Github size={22}/></button>
-                  <button className="p-5 bg-white/5 border border-white/10 rounded-2xl hover:bg-white/10 transition-colors opacity-40"><Figma size={22}/></button>
-                  <button className="p-5 bg-white/5 border border-white/10 rounded-2xl hover:bg-white/10 transition-colors opacity-40"><Chrome size={22}/></button>
-                </div>
-              </div>
-            </motion.div>
-
-            <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 0.5 }} className="mt-16 flex flex-col items-center space-y-8 text-center">
-               <Fingerprint size={36} className="text-gray-700 animate-pulse" />
-               <p className="text-[10px] font-bold text-gray-600 tracking-wide uppercase">
-                 Don&apos;t have an account? <br/> <button className="text-cyan-400 underline underline-offset-8 mt-2">Join the Revolution.</button>
-               </p>
-            </motion.div>
-          </div>
+            <button onClick={() => handleLogin('github')} className="w-full py-4 px-4 bg-blue-600 hover:bg-blue-500 text-white font-bold rounded-2xl transition-all shadow-[0_0_20px_rgba(59,130,246,0.3)] hover:shadow-[0_0_30px_rgba(59,130,246,0.5)] flex items-center justify-center gap-3 group">
+              <Github className="w-5 h-5" /> Continue with GitHub <ArrowRight className="w-4 h-4 group-hover:translate-x-1 transition-transform" />
+            </button>
+          </motion.div>
         </div>
       ) : (
+        /* DASHBOARD */
         <>
           <nav className="relative z-10 flex justify-between items-center px-10 py-6 border-b border-white/5 backdrop-blur-xl bg-black/40 sticky top-0">
             <h1 className="text-2xl font-black italic tracking-tighter text-blue-500 uppercase">VOUCH</h1>
@@ -308,7 +283,7 @@ export default function VouchSocialPersistent() {
         </>
       )}
 
-      {/* DRAWER: EDIT IDENTITY */}
+      {/* MODALS */}
       <AnimatePresence>
         {isEditOpen && (
           <div className="fixed inset-0 z-50 flex justify-end">
@@ -325,7 +300,6 @@ export default function VouchSocialPersistent() {
         )}
       </AnimatePresence>
 
-      {/* MODAL: ADD PROOF */}
       <AnimatePresence>
         {isModalOpen && (
           <div className="fixed inset-0 z-50 flex items-center justify-center p-6">
