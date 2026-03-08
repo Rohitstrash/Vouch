@@ -8,27 +8,24 @@ import { motion, AnimatePresence } from 'framer-motion'
 import { 
   Github, LogOut, ExternalLink, Plus, CheckCircle, 
   RefreshCw, Zap, MapPin, Figma, Linkedin, Gitlab, X, 
-  Edit3, Heart, ShieldCheck, Rocket, Share2, Chrome, Fingerprint,
-  BadgeCheck, ArrowRight 
+  Edit3, Heart, ShieldCheck, Rocket, Share2, Chrome, Fingerprint 
 } from 'lucide-react'
 import { signOut } from './actions'
 
-type Platform = 'github' | 'figma' | 'linkedin' | 'gitlab'
-
 export default function VouchSocialPersistent() {
-  const [user, setUser] = useState<any>(null)
+  const [user, setUser] = useState(null)
   const [loading, setLoading] = useState(true)
   const [isSyncing, setIsSyncing] = useState(false)
   const [isModalOpen, setIsModalOpen] = useState(false)
   const [isEditOpen, setIsEditOpen] = useState(false)
-  const [activePlatform, setActivePlatform] = useState<Platform>('github')
+  const [activePlatform, setActivePlatform] = useState('github')
 
   const [displayName, setDisplayName] = useState('')
   const [displayBio, setDisplayBio] = useState('Building the future of reputation.')
-  const [projects, setProjects] = useState<any[]>([])
+  const [projects, setProjects] = useState([])
   
-  const [vouchedIds, setVouchedIds] = useState<string[]>([]) 
-  const [globalVouchCounts, setGlobalVouchCounts] = useState<any>({})
+  const [vouchedIds, setVouchedIds] = useState([]) 
+  const [globalVouchCounts, setGlobalVouchCounts] = useState({})
 
   const supabase = createBrowserClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL || '',
@@ -42,8 +39,8 @@ export default function VouchSocialPersistent() {
         
         const { data: allVouches } = await supabase.from('vouches').select('project_id')
         if (allVouches) {
-          const counts: any = {}
-          allVouches.forEach((v: any) => { counts[v.project_id] = (counts[v.project_id] || 0) + 1 })
+          const counts = {}
+          allVouches.forEach(v => { counts[v.project_id] = (counts[v.project_id] || 0) + 1 })
           setGlobalVouchCounts(counts)
         }
 
@@ -53,7 +50,7 @@ export default function VouchSocialPersistent() {
           setDisplayBio(session.user.user_metadata?.bio || 'Building the future of reputation.')
           
           const { data: myVouches } = await supabase.from('vouches').select('project_id').eq('voucher_id', session.user.id)
-          if (myVouches) setVouchedIds(myVouches.map((v: any) => v.project_id))
+          if (myVouches) setVouchedIds(myVouches.map(v => v.project_id))
 
           const { data: dbProjects } = await supabase.from('projects').select('*').eq('user_id', session.user.id)
           
@@ -69,7 +66,7 @@ export default function VouchSocialPersistent() {
           }
         }
       } catch (e) {
-        console.error("Auth error", e)
+        console.error("Init Error", e)
       } finally {
         setLoading(false)
       }
@@ -77,7 +74,7 @@ export default function VouchSocialPersistent() {
     initializeProtocol()
   }, [])
 
-  const fetchGitHubRepos = async (authIdentifier: string, existingDbProjects: any[], isToken: boolean) => {
+  const fetchGitHubRepos = async (authIdentifier, existingDbProjects, isToken) => {
     setIsSyncing(true)
     try {
       const url = isToken 
@@ -95,7 +92,7 @@ export default function VouchSocialPersistent() {
 
       const data = await res.json()
       if (Array.isArray(data)) {
-        const githubData = data.map((repo: any) => ({
+        const githubData = data.map(repo => ({
           id: repo.id.toString(),
           platform: 'github',
           title: repo.name,
@@ -105,8 +102,8 @@ export default function VouchSocialPersistent() {
           difficulty_weight: 1 
         }))
         
-        const existingIds = new Set(existingDbProjects.map((p: any) => p.id))
-        const uniqueGithubData = githubData.filter((repo: any) => !existingIds.has(repo.id))
+        const existingIds = new Set(existingDbProjects.map(p => p.id))
+        const uniqueGithubData = githubData.filter(repo => !existingIds.has(repo.id))
         
         setProjects([...uniqueGithubData, ...existingDbProjects])
       }
@@ -117,22 +114,24 @@ export default function VouchSocialPersistent() {
     }
   }
 
-  const handleVouch = async (projectId: string) => {
+  const handleVouch = async (projectId) => {
     if (!user?.id || vouchedIds.includes(projectId)) return
 
     setVouchedIds(prev => [...prev, projectId])
-    setGlobalVouchCounts((prev: any) => ({ ...prev, [projectId]: (prev[projectId] || 0) + 1 }))
+    setGlobalVouchCounts(prev => ({ ...prev, [projectId]: (prev[projectId] || 0) + 1 }))
 
     try {
       await supabase.from('vouches').insert({ project_id: projectId, voucher_id: user.id })
-    } catch (e) { console.error(e) }
+    } catch (e) {
+      console.error(e)
+    }
   }
 
-  const handleUpdateProfile = async (e: any) => {
+  const handleUpdateProfile = async (e) => {
     e.preventDefault()
     const formData = new FormData(e.currentTarget)
-    const newName = formData.get('name') as string
-    const newBio = formData.get('bio') as string
+    const newName = formData.get('name')
+    const newBio = formData.get('bio')
 
     setDisplayName(newName)
     setDisplayBio(newBio)
@@ -140,10 +139,12 @@ export default function VouchSocialPersistent() {
 
     try {
       await supabase.auth.updateUser({ data: { full_name: newName, bio: newBio } })
-    } catch (e) { console.error(e) }
+    } catch (e) {
+      console.error(e)
+    }
   }
 
-  const handleAddProof = async (e: any) => {
+  const handleAddProof = async (e) => {
     e.preventDefault()
     const formData = new FormData(e.currentTarget)
     const newId = `manual-${Date.now()}`
@@ -151,72 +152,89 @@ export default function VouchSocialPersistent() {
     const newProj = {
       id: newId,
       user_id: user?.id,
-      title: formData.get('title') as string,
-      tag: formData.get('tag') as string,
-      desc: formData.get('desc') as string,
+      title: formData.get('title'),
+      tag: formData.get('tag'),
+      description: formData.get('desc'),
       platform: activePlatform,
-      difficulty_weight: parseInt(formData.get('difficulty') as string) || 1
+      difficulty_weight: parseInt(formData.get('difficulty')) || 1
     }
 
-    setProjects([{...newProj, description: newProj.desc}, ...projects])
-    setIsModalOpen(false)
-    
     try {
       await supabase.from('projects').insert(newProj)
-    } catch (e) { console.error(e) }
+      setProjects([{...newProj, desc: newProj.description}, ...projects])
+      setIsModalOpen(false)
+    } catch(e) {
+      console.error(e)
+    }
   }
 
-  const totalReputation = projects.reduce((acc: number, p: any) => {
+  const totalReputation = projects.reduce((acc, p) => {
     const count = globalVouchCounts[p.id] || 0
     return acc + (count * (p.difficulty_weight || 1))
   }, 0)
 
-  const handleLogin = (provider: any) => {
-    try {
-      supabase.auth.signInWithOAuth({ 
-        provider, 
-        options: { 
-          redirectTo: typeof window !== 'undefined' ? `${window.location.origin}/auth/callback` : '',
-          scopes: provider === 'github' ? 'repo read:user' : undefined,
-          queryParams: { access_type: 'offline', prompt: 'consent' }
-        } 
-      })
-    } catch (e) { console.error(e) }
+  const handleLogin = (provider = 'github') => {
+    supabase.auth.signInWithOAuth({ 
+      provider, 
+      options: { 
+        redirectTo: `${window.location.origin}/auth/callback`,
+        scopes: provider === 'github' ? 'repo read:user' : undefined,
+        queryParams: { access_type: 'offline', prompt: 'consent' }
+      } 
+    })
   }
 
   if (loading) return (
-    <div className="h-screen bg-[#020202] flex items-center justify-center font-black text-blue-500 text-5xl italic animate-pulse">VOUCH</div>
+    <div className="h-screen bg-black flex items-center justify-center font-black text-blue-500 text-5xl italic animate-pulse">VOUCH</div>
   )
 
   return (
     <main className="min-h-screen bg-[#020202] text-white font-sans selection:bg-blue-500/30 overflow-x-hidden">
       {!user ? (
-        /* FIGMA-INJECTED LOGIN SCREEN */
-        <div className="min-h-screen flex flex-col items-center justify-center relative px-4 z-10">
-          <div className="absolute top-8 left-8 flex items-center gap-3 group">
-            <div className="bg-gradient-to-br from-blue-500 to-blue-700 p-2 rounded-xl shadow-[0_0_20px_rgba(59,130,246,0.5)] group-hover:shadow-[0_0_25px_rgba(59,130,246,0.7)] transition-all">
-              <BadgeCheck className="h-5 w-5 text-white" />
-            </div>
-            <span className="font-extrabold text-xl tracking-tighter text-white">VOUCH</span>
+        <div className="relative min-h-screen flex items-center justify-center px-6">
+          <div className="absolute inset-0 overflow-hidden pointer-events-none">
+            <div className="absolute top-[-10%] left-[-10%] w-[600px] h-[600px] bg-cyan-500/20 blur-[150px] rounded-full animate-pulse" />
+            <div className="absolute bottom-[10%] right-[-5%] w-[500px] h-[500px] bg-purple-600/15 blur-[130px] rounded-full animate-pulse" style={{ animationDelay: '2s' }} />
           </div>
 
-          <motion.div 
-            initial={{ opacity: 0, scale: 0.95 }}
-            animate={{ opacity: 1, scale: 1 }}
-            className="w-full max-w-md bg-white/5 backdrop-blur-2xl border border-white/10 rounded-3xl p-8 shadow-[0_8px_32px_rgba(0,0,0,0.4)]"
-          >
-            <div className="text-center mb-10">
-              <h2 className="text-3xl font-extrabold text-white tracking-tight mb-2">Welcome back</h2>
-              <p className="text-gray-400 font-medium text-sm">Log in to continue building your reputation.</p>
-            </div>
+          <div className="relative z-10 w-full max-w-[420px] py-12 flex flex-col items-center">
+            <motion.div initial={{ y: -20, opacity: 0 }} animate={{ y: 0, opacity: 1 }} className="flex flex-col items-center mb-12 text-center">
+              <div className="relative mb-6">
+                 <Share2 size={64} className="text-cyan-400 drop-shadow-[0_0_15px_rgba(34,211,238,0.5)]" />
+                 <div className="absolute inset-0 bg-cyan-400 blur-3xl opacity-20" />
+              </div>
+              <h1 className="text-6xl font-black italic tracking-tighter bg-gradient-to-r from-white to-gray-400 bg-clip-text text-transparent uppercase">VOUCH</h1>
+              <p className="text-[10px] font-black uppercase tracking-[0.4em] text-cyan-400/80 mt-3 leading-relaxed">The Anti-Resume. <br/> Verify Your Skills.</p>
+            </motion.div>
 
-            <button onClick={() => handleLogin('github')} className="w-full py-4 px-4 bg-blue-600 hover:bg-blue-500 text-white font-bold rounded-2xl transition-all shadow-[0_0_20px_rgba(59,130,246,0.3)] hover:shadow-[0_0_30px_rgba(59,130,246,0.5)] flex items-center justify-center gap-3 group">
-              <Github className="w-5 h-5" /> Continue with GitHub <ArrowRight className="w-4 h-4 group-hover:translate-x-1 transition-transform" />
-            </button>
-          </motion.div>
+            <motion.div initial={{ scale: 0.9, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} className="w-full bg-white/[0.03] backdrop-blur-2xl border border-white/10 rounded-[3rem] p-10 shadow-2xl space-y-10">
+              <div className="text-center space-y-2">
+                 <p className="text-[10px] font-black text-gray-500 uppercase tracking-widest">Protocol Entrance</p>
+                 <h3 className="text-xl font-bold italic uppercase tracking-tighter">Ready for Launch?</h3>
+              </div>
+              <button onClick={() => handleLogin('github')} className="w-full py-6 rounded-[1.5rem] bg-gradient-to-r from-cyan-400 to-purple-500 text-black font-black text-xs uppercase tracking-widest flex items-center justify-center gap-3 hover:scale-[1.02] active:scale-95 transition-all shadow-xl shadow-cyan-500/20">
+                <Rocket size={20} /> Launch (Login)
+              </button>
+              <div className="text-center space-y-6 pt-2">
+                <span className="text-[9px] font-black text-gray-600 uppercase tracking-widest italic flex items-center justify-center gap-2">
+                   <div className="w-8 h-px bg-white/5"/> Or Continue With <div className="w-8 h-px bg-white/5"/>
+                </span>
+                <div className="flex justify-center gap-5">
+                  <button onClick={() => handleLogin('github')} className="p-5 bg-white/5 border border-white/10 rounded-2xl hover:bg-white/10 transition-colors"><Github size={22}/></button>
+                  <button className="p-5 bg-white/5 border border-white/10 rounded-2xl hover:bg-white/10 transition-colors opacity-40"><Figma size={22}/></button>
+                  <button className="p-5 bg-white/5 border border-white/10 rounded-2xl hover:bg-white/10 transition-colors opacity-40"><Chrome size={22}/></button>
+                </div>
+              </div>
+            </motion.div>
+            <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 0.5 }} className="mt-16 flex flex-col items-center space-y-8 text-center">
+               <Fingerprint size={36} className="text-gray-700 animate-pulse" />
+               <p className="text-[10px] font-bold text-gray-600 tracking-wide uppercase">
+                 Don&apos;t have an account? <br/> <button className="text-cyan-400 underline underline-offset-8 mt-2">Join the Revolution.</button>
+               </p>
+            </motion.div>
+          </div>
         </div>
       ) : (
-        /* DASHBOARD */
         <>
           <nav className="relative z-10 flex justify-between items-center px-10 py-6 border-b border-white/5 backdrop-blur-xl bg-black/40 sticky top-0">
             <h1 className="text-2xl font-black italic tracking-tighter text-blue-500 uppercase">VOUCH</h1>
@@ -233,7 +251,7 @@ export default function VouchSocialPersistent() {
               <motion.header initial={{ y: 20, opacity: 0 }} animate={{ y: 0, opacity: 1 }} className="flex flex-col md:flex-row items-center justify-between gap-10">
                 <div className="flex flex-col md:flex-row items-center gap-8">
                   <div className="relative">
-                    <img src={user.user_metadata.avatar_url || 'https://github.com/github.png'} className="w-32 h-32 rounded-[2.5rem] border-2 border-blue-500/20 shadow-2xl" alt="Identity" />
+                    <img src={user.user_metadata.avatar_url} className="w-32 h-32 rounded-[2.5rem] border-2 border-blue-500/20 shadow-2xl" alt="Identity" />
                     <button onClick={() => setIsEditOpen(true)} className="absolute -bottom-2 -right-2 bg-blue-600 p-2 rounded-xl border-4 border-[#020202] hover:scale-110 transition-all"><Edit3 size={16} /></button>
                   </div>
                   <div className="text-center md:text-left space-y-4">
@@ -249,7 +267,7 @@ export default function VouchSocialPersistent() {
               </motion.header>
 
               <div className="flex gap-8 border-b border-white/5 overflow-x-auto no-scrollbar pb-2">
-                {(['github', 'figma', 'linkedin', 'gitlab'] as Platform[]).map((p) => {
+                {['github', 'figma', 'linkedin', 'gitlab'].map((p) => {
                   const TabIcon = p === 'github' ? Github : p === 'figma' ? Figma : p === 'linkedin' ? Linkedin : Gitlab;
                   return (
                     <button 
@@ -286,7 +304,6 @@ export default function VouchSocialPersistent() {
         </>
       )}
 
-      {/* MODALS */}
       <AnimatePresence>
         {isEditOpen && (
           <div className="fixed inset-0 z-50 flex justify-end">
@@ -330,7 +347,7 @@ export default function VouchSocialPersistent() {
   )
 }
 
-function WorkCard({ title, tag, desc, link, platform, vouchCount, onVouch, vouched }: any) {
+function WorkCard({ title, tag, desc, link, platform, vouchCount, onVouch, vouched }) {
   const Icon = platform === 'github' ? Github : platform === 'figma' ? Figma : platform === 'linkedin' ? Linkedin : Gitlab;
   
   return (
