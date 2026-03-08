@@ -12,69 +12,79 @@ import {
 } from 'lucide-react'
 import { signOut } from './actions'
 
+type Platform = 'github' | 'figma' | 'linkedin' | 'gitlab'
+
+// Added Interfaces for Safety
+interface ProjectData {
+  id: string;
+  title: string;
+  tag: string;
+  desc: string;
+  description?: string;
+  platform: string;
+  difficulty_weight: number;
+  link?: string;
+  user_id?: string;
+}
+
 export default function VouchSocialPersistent() {
-  const [user, setUser] = useState(null)
+  const [user, setUser] = useState<any>(null)
   const [loading, setLoading] = useState(true)
   const [isSyncing, setIsSyncing] = useState(false)
   const [isModalOpen, setIsModalOpen] = useState(false)
   const [isEditOpen, setIsEditOpen] = useState(false)
-  const [activePlatform, setActivePlatform] = useState('github')
+  const [activePlatform, setActivePlatform] = useState<Platform>('github')
 
   const [displayName, setDisplayName] = useState('')
   const [displayBio, setDisplayBio] = useState('Building the future of reputation.')
-  const [projects, setProjects] = useState([])
+  const [projects, setProjects] = useState<ProjectData[]>([])
   
-  const [vouchedIds, setVouchedIds] = useState([]) 
-  const [globalVouchCounts, setGlobalVouchCounts] = useState({})
+  const [vouchedIds, setVouchedIds] = useState<string[]>([]) 
+  const [globalVouchCounts, setGlobalVouchCounts] = useState<Record<string, number>>({})
 
   const supabase = createBrowserClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL || '',
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || ''
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
   )
 
   useEffect(() => {
     async function initializeProtocol() {
-      try {
-        const { data: { session } } = await supabase.auth.getSession()
-        
-        const { data: allVouches } = await supabase.from('vouches').select('project_id')
-        if (allVouches) {
-          const counts = {}
-          allVouches.forEach(v => { counts[v.project_id] = (counts[v.project_id] || 0) + 1 })
-          setGlobalVouchCounts(counts)
-        }
-
-        if (session) {
-          setUser(session.user)
-          setDisplayName(session.user.user_metadata?.full_name || session.user.user_metadata?.user_name || 'New Builder')
-          setDisplayBio(session.user.user_metadata?.bio || 'Building the future of reputation.')
-          
-          const { data: myVouches } = await supabase.from('vouches').select('project_id').eq('voucher_id', session.user.id)
-          if (myVouches) setVouchedIds(myVouches.map(v => v.project_id))
-
-          const { data: dbProjects } = await supabase.from('projects').select('*').eq('user_id', session.user.id)
-          
-          const token = session.provider_token
-          const githubUsername = session.user.user_metadata?.preferred_username || session.user.user_metadata?.user_name
-          
-          if (token) {
-            await fetchGitHubRepos(token, dbProjects || [], true)
-          } else if (githubUsername) {
-            await fetchGitHubRepos(githubUsername, dbProjects || [], false)
-          } else if (dbProjects) {
-            setProjects(dbProjects)
-          }
-        }
-      } catch (e) {
-        console.error("Init Error", e)
-      } finally {
-        setLoading(false)
+      const { data: { session } } = await supabase.auth.getSession()
+      
+      const { data: allVouches } = await supabase.from('vouches').select('project_id')
+      if (allVouches) {
+        const counts: Record<string, number> = {}
+        allVouches.forEach(v => { counts[v.project_id] = (counts[v.project_id] || 0) + 1 })
+        setGlobalVouchCounts(counts)
       }
+
+      if (session) {
+        setUser(session.user)
+        setDisplayName(session.user.user_metadata?.full_name || session.user.user_metadata?.user_name || 'New Builder')
+        setDisplayBio(session.user.user_metadata?.bio || 'Building the future of reputation.')
+        
+        const { data: myVouches } = await supabase.from('vouches').select('project_id').eq('voucher_id', session.user.id)
+        if (myVouches) setVouchedIds(myVouches.map(v => v.project_id))
+
+        const { data: dbProjects } = await supabase.from('projects').select('*').eq('user_id', session.user.id)
+        
+        const token = session.provider_token
+        const githubUsername = session.user.user_metadata?.preferred_username || session.user.user_metadata?.user_name
+        
+        if (token) {
+          await fetchGitHubRepos(token, dbProjects || [], true)
+        } else if (githubUsername) {
+          await fetchGitHubRepos(githubUsername, dbProjects || [], false)
+        } else if (dbProjects) {
+          setProjects(dbProjects)
+        }
+      }
+      setLoading(false)
     }
     initializeProtocol()
   }, [])
 
-  const fetchGitHubRepos = async (authIdentifier, existingDbProjects, isToken) => {
+  const fetchGitHubRepos = async (authIdentifier: string, existingDbProjects: any[], isToken: boolean) => {
     setIsSyncing(true)
     try {
       const url = isToken 
@@ -86,6 +96,7 @@ export default function VouchSocialPersistent() {
       const res = await fetch(url, { headers })
       
       if (!res.ok) {
+        console.error("GitHub API Error:", res.statusText)
         setProjects(existingDbProjects)
         return
       }
@@ -108,43 +119,36 @@ export default function VouchSocialPersistent() {
         setProjects([...uniqueGithubData, ...existingDbProjects])
       }
     } catch (e) { 
+      console.error(e) 
       setProjects(existingDbProjects)
     } finally { 
       setIsSyncing(false) 
     }
   }
 
-  const handleVouch = async (projectId) => {
+  const handleVouch = async (projectId: string) => {
     if (!user?.id || vouchedIds.includes(projectId)) return
 
     setVouchedIds(prev => [...prev, projectId])
     setGlobalVouchCounts(prev => ({ ...prev, [projectId]: (prev[projectId] || 0) + 1 }))
 
-    try {
-      await supabase.from('vouches').insert({ project_id: projectId, voucher_id: user.id })
-    } catch (e) {
-      console.error(e)
-    }
+    await supabase.from('vouches').insert({ project_id: projectId, voucher_id: user.id })
   }
 
-  const handleUpdateProfile = async (e) => {
+  const handleUpdateProfile = async (e: any) => {
     e.preventDefault()
     const formData = new FormData(e.currentTarget)
-    const newName = formData.get('name')
-    const newBio = formData.get('bio')
+    const newName = formData.get('name') as string
+    const newBio = formData.get('bio') as string
 
     setDisplayName(newName)
     setDisplayBio(newBio)
     setIsEditOpen(false)
 
-    try {
-      await supabase.auth.updateUser({ data: { full_name: newName, bio: newBio } })
-    } catch (e) {
-      console.error(e)
-    }
+    await supabase.auth.updateUser({ data: { full_name: newName, bio: newBio } })
   }
 
-  const handleAddProof = async (e) => {
+  const handleAddProof = async (e: any) => {
     e.preventDefault()
     const formData = new FormData(e.currentTarget)
     const newId = `manual-${Date.now()}`
@@ -152,20 +156,16 @@ export default function VouchSocialPersistent() {
     const newProj = {
       id: newId,
       user_id: user?.id,
-      title: formData.get('title'),
-      tag: formData.get('tag'),
-      description: formData.get('desc'),
+      title: formData.get('title') as string,
+      tag: formData.get('tag') as string,
+      desc: formData.get('desc') as string,
       platform: activePlatform,
-      difficulty_weight: parseInt(formData.get('difficulty')) || 1
+      difficulty_weight: parseInt(formData.get('difficulty') as string) || 1
     }
 
-    try {
-      await supabase.from('projects').insert(newProj)
-      setProjects([{...newProj, desc: newProj.description}, ...projects])
-      setIsModalOpen(false)
-    } catch(e) {
-      console.error(e)
-    }
+    await supabase.from('projects').insert(newProj)
+    setProjects([{...newProj, description: newProj.desc}, ...projects])
+    setIsModalOpen(false)
   }
 
   const totalReputation = projects.reduce((acc, p) => {
@@ -173,13 +173,16 @@ export default function VouchSocialPersistent() {
     return acc + (count * (p.difficulty_weight || 1))
   }, 0)
 
-  const handleLogin = (provider = 'github') => {
+  const handleLogin = (provider: 'github' | 'google' = 'github') => {
     supabase.auth.signInWithOAuth({ 
       provider, 
       options: { 
         redirectTo: `${window.location.origin}/auth/callback`,
         scopes: provider === 'github' ? 'repo read:user' : undefined,
-        queryParams: { access_type: 'offline', prompt: 'consent' }
+        queryParams: {
+          access_type: 'offline',
+          prompt: 'consent',
+        }
       } 
     })
   }
@@ -226,6 +229,7 @@ export default function VouchSocialPersistent() {
                 </div>
               </div>
             </motion.div>
+
             <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 0.5 }} className="mt-16 flex flex-col items-center space-y-8 text-center">
                <Fingerprint size={36} className="text-gray-700 animate-pulse" />
                <p className="text-[10px] font-bold text-gray-600 tracking-wide uppercase">
@@ -267,7 +271,7 @@ export default function VouchSocialPersistent() {
               </motion.header>
 
               <div className="flex gap-8 border-b border-white/5 overflow-x-auto no-scrollbar pb-2">
-                {['github', 'figma', 'linkedin', 'gitlab'].map((p) => {
+                {(['github', 'figma', 'linkedin', 'gitlab'] as Platform[]).map((p) => {
                   const TabIcon = p === 'github' ? Github : p === 'figma' ? Figma : p === 'linkedin' ? Linkedin : Gitlab;
                   return (
                     <button 
@@ -304,6 +308,7 @@ export default function VouchSocialPersistent() {
         </>
       )}
 
+      {/* DRAWER: EDIT IDENTITY */}
       <AnimatePresence>
         {isEditOpen && (
           <div className="fixed inset-0 z-50 flex justify-end">
@@ -320,6 +325,7 @@ export default function VouchSocialPersistent() {
         )}
       </AnimatePresence>
 
+      {/* MODAL: ADD PROOF */}
       <AnimatePresence>
         {isModalOpen && (
           <div className="fixed inset-0 z-50 flex items-center justify-center p-6">
@@ -347,7 +353,7 @@ export default function VouchSocialPersistent() {
   )
 }
 
-function WorkCard({ title, tag, desc, link, platform, vouchCount, onVouch, vouched }) {
+function WorkCard({ title, tag, desc, link, platform, vouchCount, onVouch, vouched }: any) {
   const Icon = platform === 'github' ? Github : platform === 'figma' ? Figma : platform === 'linkedin' ? Linkedin : Gitlab;
   
   return (
