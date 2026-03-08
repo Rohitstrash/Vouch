@@ -7,24 +7,13 @@ import { useEffect, useState } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { 
   Github, LogOut, ExternalLink, Plus, CheckCircle, 
-  RefreshCw, Zap, Figma, Linkedin, Gitlab, X, 
-  Edit3, Heart, ShieldCheck, BadgeCheck, ArrowRight 
+  RefreshCw, Zap, MapPin, Figma, Linkedin, Gitlab, X, 
+  Edit3, Heart, ShieldCheck, Rocket, Share2, Chrome, Fingerprint,
+  BadgeCheck, ArrowRight 
 } from 'lucide-react'
 import { signOut } from './actions'
 
 type Platform = 'github' | 'figma' | 'linkedin' | 'gitlab'
-
-interface ProjectData {
-  id: string;
-  title: string;
-  tag: string;
-  desc: string;
-  description?: string;
-  platform: string;
-  difficulty_weight: number;
-  link?: string;
-  user_id?: string;
-}
 
 export default function VouchSocialPersistent() {
   const [user, setUser] = useState<any>(null)
@@ -36,49 +25,54 @@ export default function VouchSocialPersistent() {
 
   const [displayName, setDisplayName] = useState('')
   const [displayBio, setDisplayBio] = useState('Building the future of reputation.')
-  const [projects, setProjects] = useState<ProjectData[]>([])
+  const [projects, setProjects] = useState<any[]>([])
   
   const [vouchedIds, setVouchedIds] = useState<string[]>([]) 
-  const [globalVouchCounts, setGlobalVouchCounts] = useState<Record<string, number>>({})
+  const [globalVouchCounts, setGlobalVouchCounts] = useState<any>({})
 
   const supabase = createBrowserClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+    process.env.NEXT_PUBLIC_SUPABASE_URL || '',
+    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || ''
   )
 
   useEffect(() => {
     async function initializeProtocol() {
-      const { data: { session } } = await supabase.auth.getSession()
-      
-      const { data: allVouches } = await supabase.from('vouches').select('project_id')
-      if (allVouches) {
-        const counts: Record<string, number> = {}
-        allVouches.forEach(v => { counts[v.project_id] = (counts[v.project_id] || 0) + 1 })
-        setGlobalVouchCounts(counts)
-      }
-
-      if (session) {
-        setUser(session.user)
-        setDisplayName(session.user.user_metadata?.full_name || session.user.user_metadata?.user_name || 'New Builder')
-        setDisplayBio(session.user.user_metadata?.bio || 'Building the future of reputation.')
+      try {
+        const { data: { session } } = await supabase.auth.getSession()
         
-        const { data: myVouches } = await supabase.from('vouches').select('project_id').eq('voucher_id', session.user.id)
-        if (myVouches) setVouchedIds(myVouches.map(v => v.project_id))
-
-        const { data: dbProjects } = await supabase.from('projects').select('*').eq('user_id', session.user.id)
-        
-        const token = session.provider_token
-        const githubUsername = session.user.user_metadata?.preferred_username || session.user.user_metadata?.user_name
-        
-        if (token) {
-          await fetchGitHubRepos(token, dbProjects || [], true)
-        } else if (githubUsername) {
-          await fetchGitHubRepos(githubUsername, dbProjects || [], false)
-        } else if (dbProjects) {
-          setProjects(dbProjects)
+        const { data: allVouches } = await supabase.from('vouches').select('project_id')
+        if (allVouches) {
+          const counts: any = {}
+          allVouches.forEach((v: any) => { counts[v.project_id] = (counts[v.project_id] || 0) + 1 })
+          setGlobalVouchCounts(counts)
         }
+
+        if (session) {
+          setUser(session.user)
+          setDisplayName(session.user.user_metadata?.full_name || session.user.user_metadata?.user_name || 'New Builder')
+          setDisplayBio(session.user.user_metadata?.bio || 'Building the future of reputation.')
+          
+          const { data: myVouches } = await supabase.from('vouches').select('project_id').eq('voucher_id', session.user.id)
+          if (myVouches) setVouchedIds(myVouches.map((v: any) => v.project_id))
+
+          const { data: dbProjects } = await supabase.from('projects').select('*').eq('user_id', session.user.id)
+          
+          const token = session.provider_token
+          const githubUsername = session.user.user_metadata?.preferred_username || session.user.user_metadata?.user_name
+          
+          if (token) {
+            await fetchGitHubRepos(token, dbProjects || [], true)
+          } else if (githubUsername) {
+            await fetchGitHubRepos(githubUsername, dbProjects || [], false)
+          } else if (dbProjects) {
+            setProjects(dbProjects)
+          }
+        }
+      } catch (e) {
+        console.error("Auth error", e)
+      } finally {
+        setLoading(false)
       }
-      setLoading(false)
     }
     initializeProtocol()
   }, [])
@@ -101,7 +95,7 @@ export default function VouchSocialPersistent() {
 
       const data = await res.json()
       if (Array.isArray(data)) {
-        const githubData = data.map(repo => ({
+        const githubData = data.map((repo: any) => ({
           id: repo.id.toString(),
           platform: 'github',
           title: repo.name,
@@ -111,8 +105,8 @@ export default function VouchSocialPersistent() {
           difficulty_weight: 1 
         }))
         
-        const existingIds = new Set(existingDbProjects.map(p => p.id))
-        const uniqueGithubData = githubData.filter(repo => !existingIds.has(repo.id))
+        const existingIds = new Set(existingDbProjects.map((p: any) => p.id))
+        const uniqueGithubData = githubData.filter((repo: any) => !existingIds.has(repo.id))
         
         setProjects([...uniqueGithubData, ...existingDbProjects])
       }
@@ -127,9 +121,11 @@ export default function VouchSocialPersistent() {
     if (!user?.id || vouchedIds.includes(projectId)) return
 
     setVouchedIds(prev => [...prev, projectId])
-    setGlobalVouchCounts(prev => ({ ...prev, [projectId]: (prev[projectId] || 0) + 1 }))
+    setGlobalVouchCounts((prev: any) => ({ ...prev, [projectId]: (prev[projectId] || 0) + 1 }))
 
-    await supabase.from('vouches').insert({ project_id: projectId, voucher_id: user.id })
+    try {
+      await supabase.from('vouches').insert({ project_id: projectId, voucher_id: user.id })
+    } catch (e) { console.error(e) }
   }
 
   const handleUpdateProfile = async (e: any) => {
@@ -142,7 +138,9 @@ export default function VouchSocialPersistent() {
     setDisplayBio(newBio)
     setIsEditOpen(false)
 
-    await supabase.auth.updateUser({ data: { full_name: newName, bio: newBio } })
+    try {
+      await supabase.auth.updateUser({ data: { full_name: newName, bio: newBio } })
+    } catch (e) { console.error(e) }
   }
 
   const handleAddProof = async (e: any) => {
@@ -160,25 +158,30 @@ export default function VouchSocialPersistent() {
       difficulty_weight: parseInt(formData.get('difficulty') as string) || 1
     }
 
-    await supabase.from('projects').insert(newProj)
     setProjects([{...newProj, description: newProj.desc}, ...projects])
     setIsModalOpen(false)
+    
+    try {
+      await supabase.from('projects').insert(newProj)
+    } catch (e) { console.error(e) }
   }
 
-  const totalReputation = projects.reduce((acc, p) => {
+  const totalReputation = projects.reduce((acc: number, p: any) => {
     const count = globalVouchCounts[p.id] || 0
     return acc + (count * (p.difficulty_weight || 1))
   }, 0)
 
-  const handleLogin = (provider: 'github' | 'google' = 'github') => {
-    supabase.auth.signInWithOAuth({ 
-      provider, 
-      options: { 
-        redirectTo: `${window.location.origin}/auth/callback`,
-        scopes: provider === 'github' ? 'repo read:user' : undefined,
-        queryParams: { access_type: 'offline', prompt: 'consent' }
-      } 
-    })
+  const handleLogin = (provider: any) => {
+    try {
+      supabase.auth.signInWithOAuth({ 
+        provider, 
+        options: { 
+          redirectTo: typeof window !== 'undefined' ? `${window.location.origin}/auth/callback` : '',
+          scopes: provider === 'github' ? 'repo read:user' : undefined,
+          queryParams: { access_type: 'offline', prompt: 'consent' }
+        } 
+      })
+    } catch (e) { console.error(e) }
   }
 
   if (loading) return (
@@ -230,7 +233,7 @@ export default function VouchSocialPersistent() {
               <motion.header initial={{ y: 20, opacity: 0 }} animate={{ y: 0, opacity: 1 }} className="flex flex-col md:flex-row items-center justify-between gap-10">
                 <div className="flex flex-col md:flex-row items-center gap-8">
                   <div className="relative">
-                    <img src={user.user_metadata.avatar_url} className="w-32 h-32 rounded-[2.5rem] border-2 border-blue-500/20 shadow-2xl" alt="Identity" />
+                    <img src={user.user_metadata.avatar_url || 'https://github.com/github.png'} className="w-32 h-32 rounded-[2.5rem] border-2 border-blue-500/20 shadow-2xl" alt="Identity" />
                     <button onClick={() => setIsEditOpen(true)} className="absolute -bottom-2 -right-2 bg-blue-600 p-2 rounded-xl border-4 border-[#020202] hover:scale-110 transition-all"><Edit3 size={16} /></button>
                   </div>
                   <div className="text-center md:text-left space-y-4">
