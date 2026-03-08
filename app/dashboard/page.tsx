@@ -1,10 +1,3 @@
-@import './fonts.css';
-@import './tailwind.css';
-@import './theme.css';
-@import 'tailwindcss' source(none);
-@source '../**/*.{js,ts,jsx,tsx}';
-
-@import 'tw-animate-css';
 @custom-variant dark (&:is(.dark *));
 
 :root {
