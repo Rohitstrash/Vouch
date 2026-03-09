@@ -136,6 +136,24 @@ export default function VouchNetworkFeed() {
     )
   }
 
+  // --- DYNAMIC SKILL CALCULATOR ---
+  const topSkills = Object.entries(
+    projects.reduce((acc, proj) => {
+      // Get the skill tag (default to 'Protocol' if missing)
+      const skill = proj.tag || 'Protocol';
+      // Get the actual vouch count for this project from the database
+      const score = globalVouchCounts[proj.id] || 0; 
+      
+      acc[skill] = (acc[skill] || 0) + score;
+      return acc;
+    }, {})
+  )
+  .map(([name, count]) => ({ name, count }))
+  // Sort from highest score to lowest
+  .sort((a, b) => b.count - a.count)
+  // Only keep the top 5 for the sidebar
+  .slice(0, 5);
+
   return (
     <main className="min-h-screen bg-[#0A0D14] text-white font-sans selection:bg-blue-500/30">
       {/* TOP NAVIGATION */}
@@ -189,24 +207,22 @@ export default function VouchNetworkFeed() {
               </div>
               
               <div className="space-y-4 mb-6">
-                {[
-                  { name: 'React', count: 842 },
-                  { name: 'UX Design', count: 621 },
-                  { name: 'Node.js', count: 430 },
-                  { name: 'System Architecture', count: 312 },
-                  { name: 'Tailwind CSS', count: 290 }
-                ].map((skill, i) => (
-                  <div key={skill.name} className="flex items-center justify-between group cursor-default">
-                    <div className="flex items-center gap-4">
-                       <span className="text-xs font-bold text-gray-600 w-3">{i + 1}</span>
-                       <span className="text-sm font-medium text-gray-300 group-hover:text-white transition-colors">{skill.name}</span>
+                {topSkills.length > 0 ? (
+                  topSkills.map((skill, i) => (
+                    <div key={skill.name} className="flex items-center justify-between group cursor-default">
+                      <div className="flex items-center gap-4">
+                         <span className="text-xs font-bold text-gray-600 w-3">{i + 1}</span>
+                         <span className="text-sm font-medium text-gray-300 group-hover:text-white transition-colors">{skill.name}</span>
+                      </div>
+                      <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-white/5 border border-white/5 group-hover:bg-purple-500/10 group-hover:border-purple-500/20 transition-colors">
+                         <CheckCircle2 size={10} className="text-purple-400" />
+                         <span className="text-[10px] font-bold text-purple-400">{skill.count}</span>
+                      </div>
                     </div>
-                    <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-white/5 border border-white/5 group-hover:bg-purple-500/10 group-hover:border-purple-500/20 transition-colors">
-                       <CheckCircle2 size={10} className="text-purple-400" />
-                       <span className="text-[10px] font-bold text-purple-400">{skill.count}</span>
-                    </div>
-                  </div>
-                ))}
+                  ))
+                ) : (
+                  <p className="text-xs text-gray-500 text-center italic py-4">Publish projects to rank skills.</p>
+                )}
               </div>
               <button className="w-full py-3 bg-white/5 hover:bg-white/10 rounded-xl text-sm font-medium text-white transition-colors border border-white/5">
                 View all skills
@@ -246,7 +262,7 @@ export default function VouchNetworkFeed() {
                     key={proj.id} 
                     {...proj} 
                     author={user.user_metadata}
-                    vouchCount={globalVouchCounts[proj.id] || Math.floor(Math.random() * 50) + 10} // Fallback random for preview matching
+                    vouchCount={globalVouchCounts[proj.id] || 0} // Using exact count now
                     vouched={vouchedIds.includes(proj.id)}
                     onVouch={() => handleVouch(proj.id)} 
                   />
