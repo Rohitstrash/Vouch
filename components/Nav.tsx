@@ -7,7 +7,7 @@ export function Nav() {
     <nav className="sticky top-0 z-50 w-full bg-black/40 backdrop-blur-2xl border-b border-white/10 supports-[backdrop-filter]:bg-black/20">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="flex justify-between items-center h-20">
-          <Link to="/dashboard" className="flex items-center gap-3 cursor-pointer group">
+          <Link href="/dashboard" className="flex items-center gap-3 cursor-pointer group">
             <div className="bg-gradient-to-br from-blue-500 to-blue-700 p-2 rounded-xl shadow-[0_0_20px_rgba(59,130,246,0.5)] group-hover:shadow-[0_0_25px_rgba(59,130,246,0.7)] transition-all">
               <BadgeCheck className="h-6 w-6 text-white" />
             </div>
