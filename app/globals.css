@@ -1,68 +1,48 @@
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
-
-@import "./fonts.css";
-
 /* Theme Variables */
 @layer base {
   :root {
     --background: 0 0% 100%;
     --foreground: 0 0% 3.9%;
-
     --card: 0 0% 100%;
     --card-foreground: 0 0% 3.9%;
-
     --popover: 0 0% 100%;
     --popover-foreground: 0 0% 3.9%;
-
     --primary: 221 83% 53%;
     --primary-foreground: 0 0% 100%;
-
     --secondary: 240 4% 96%;
     --secondary-foreground: 240 5% 26%;
-
     --muted: 240 4% 96%;
     --muted-foreground: 240 4% 46%;
-
     --accent: 240 4% 96%;
     --accent-foreground: 240 5% 26%;
-
     --destructive: 0 84% 60%;
     --destructive-foreground: 0 0% 100%;
-
     --border: 240 6% 90%;
     --input: 240 6% 90%;
     --ring: 221 83% 53%;
-
     --radius: 0.5rem;
   }
 
   .dark {
     --background: 224 71% 4%;
     --foreground: 210 20% 98%;
-
     --card: 224 71% 4%;
     --card-foreground: 210 20% 98%;
-
     --popover: 224 71% 4%;
     --popover-foreground: 210 20% 98%;
-
     --primary: 217 91% 60%;
     --primary-foreground: 0 0% 100%;
-
     --secondary: 222 47% 11%;
     --secondary-foreground: 210 20% 98%;
-
     --muted: 222 47% 11%;
     --muted-foreground: 215 20% 65%;
-
     --accent: 222 47% 11%;
     --accent-foreground: 210 20% 98%;
-
     --destructive: 0 63% 31%;
     --destructive-foreground: 210 20% 98%;
-
     --border: 222 47% 11%;
     --input: 222 47% 11%;
     --ring: 217 91% 60%;
@@ -72,12 +52,10 @@
 /* Base Styles */
 @layer base {
   * {
-    /* FIXED: Using standard CSS to read the variable */
     border-color: hsl(var(--border));
   }
 
   body {
-    /* FIXED: Using standard CSS instead of unconfigured @apply */
     background-color: hsl(var(--background));
     color: hsl(var(--foreground));
   }
@@ -86,31 +64,11 @@
     font-size: 16px;
   }
 
-  h1 {
-    @apply text-3xl font-semibold;
-  }
-
-  h2 {
-    @apply text-2xl font-semibold;
-  }
-
-  h3 {
-    @apply text-xl font-semibold;
-  }
-
-  h4 {
-    @apply text-lg font-semibold;
-  }
-
-  label {
-    @apply text-sm font-medium;
-  }
-
-  button {
-    @apply text-sm font-medium;
-  }
-
-  input {
-    @apply text-sm;
-  }
+  h1 { @apply text-3xl font-semibold; }
+  h2 { @apply text-2xl font-semibold; }
+  h3 { @apply text-xl font-semibold; }
+  h4 { @apply text-lg font-semibold; }
+  label { @apply text-sm font-medium; }
+  button { @apply text-sm font-medium; }
+  input { @apply text-sm; }
 }
