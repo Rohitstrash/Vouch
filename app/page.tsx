@@ -8,7 +8,7 @@ import { motion, AnimatePresence } from 'framer-motion'
 import { 
   Search, Bell, MessageSquare, Flame, Clock, Filter, 
   CheckCircle2, MoreHorizontal, Sparkles, Trophy, 
-  Github, LogOut, Heart, Plus, Zap
+  Github, LogOut, Heart, Plus, Zap, RefreshCw, ExternalLink
 } from 'lucide-react'
 import { signOut } from './actions'
 
