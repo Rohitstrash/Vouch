@@ -8,7 +8,8 @@ import { motion, AnimatePresence } from 'framer-motion'
 import { 
   Search, Bell, MessageSquare, Flame, Clock, Filter, 
   CheckCircle2, MoreHorizontal, Sparkles, Trophy, 
-  Github, LogOut, Heart, Plus, Zap, RefreshCw, ExternalLink, ArrowRight, Mail
+  Github, LogOut, Heart, Plus, Zap, RefreshCw, ExternalLink, ArrowRight, Mail,
+  Edit2, X
 } from 'lucide-react'
 import { signOut } from './actions'
 
@@ -25,6 +26,12 @@ export default function VouchNetworkFeed() {
   const [password, setPassword] = useState('')
   const [isLoginView, setIsLoginView] = useState(false)
   const [authMsg, setAuthMsg] = useState({ text: '', type: '' })
+
+  // --- NEW DYNAMIC STATES ---
+  const [searchQuery, setSearchQuery] = useState('')
+  const [showNotifications, setShowNotifications] = useState(false)
+  const [isEditingProfile, setIsEditingProfile] = useState(false)
+  const [profileForm, setProfileForm] = useState({ full_name: '', bio: '', avatar_url: '' })
 
   const supabase = createBrowserClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL || '',
@@ -45,6 +52,12 @@ export default function VouchNetworkFeed() {
 
         if (session) {
           setUser(session.user)
+          // Set initial profile form state
+          setProfileForm({
+            full_name: session.user.user_metadata?.full_name || session.user.user_metadata?.user_name || session.user.email.split('@')[0],
+            bio: session.user.user_metadata?.bio || 'Building the future.',
+            avatar_url: session.user.user_metadata?.avatar_url || 'https://www.gravatar.com/avatar/?d=mp'
+          })
           
           const { data: myVouches } = await supabase.from('vouches').select('project_id').eq('voucher_id', session.user.id)
           if (myVouches) setVouchedIds(myVouches.map(v => v.project_id))
@@ -93,6 +106,8 @@ export default function VouchNetworkFeed() {
           platform: 'github',
           title: repo.name,
           tag: repo.language || 'Protocol',
+          // Creating dynamic skills array based on language
+          skills: [repo.language, 'Architecture', 'Open Source'].filter(Boolean), 
           desc: repo.description || 'Verified via GitHub Sync. Building scalable solutions.',
           link: repo.html_url,
           difficulty_weight: 1 
@@ -132,7 +147,7 @@ export default function VouchNetworkFeed() {
     if (isLoginView) {
       const { error } = await supabase.auth.signInWithPassword({ email, password })
       if (error) setAuthMsg({ text: error.message, type: 'error' })
-      else window.location.reload() // Successful login
+      else window.location.reload()
     } else {
       const { error } = await supabase.auth.signUp({ 
         email, 
@@ -144,13 +159,29 @@ export default function VouchNetworkFeed() {
     }
   }
 
+  // --- SAVE UPDATED PROFILE ---
+  const saveProfile = async () => {
+    try {
+      const { data, error } = await supabase.auth.updateUser({
+        data: { 
+          full_name: profileForm.full_name,
+          bio: profileForm.bio,
+          avatar_url: profileForm.avatar_url
+        }
+      })
+      if (error) throw error
+      setUser(data.user) // Update local user state
+      setIsEditingProfile(false) // Close modal
+    } catch (error) {
+      alert("Error updating profile: " + error.message)
+    }
+  }
+
   if (loading) return <div className="h-screen bg-[#0A0D14] flex items-center justify-center text-blue-500 animate-pulse font-bold text-2xl">Initializing Network...</div>
 
-  // --- NEW LOGIN UI ---
   if (!user) {
     return (
       <div className="min-h-screen bg-[#0A0D14] flex flex-col items-center justify-center p-4 relative overflow-hidden">
-         {/* Background Glow */}
          <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[600px] h-[600px] bg-blue-600/10 blur-[120px] rounded-full pointer-events-none" />
          
          <motion.div 
@@ -158,12 +189,10 @@ export default function VouchNetworkFeed() {
            animate={{ opacity: 1, y: 0 }}
            className="w-full max-w-[400px] bg-[#151821] border border-white/5 rounded-[2.5rem] p-8 sm:p-10 shadow-2xl shadow-black/50 relative z-10"
          >
-            {/* Logo */}
             <div className="w-14 h-14 bg-blue-600 rounded-2xl flex items-center justify-center mx-auto mb-6 shadow-[0_0_30px_rgba(37,99,235,0.4)]">
                <CheckCircle2 size={28} className="text-white" strokeWidth={2.5} />
             </div>
 
-            {/* Header */}
             <h1 className="text-2xl font-black text-white text-center tracking-tight mb-2">
               {isLoginView ? 'Welcome Back' : 'Join Vouch'}
             </h1>
@@ -171,7 +200,6 @@ export default function VouchNetworkFeed() {
               {isLoginView ? 'Sign in to continue.' : 'Showcase projects. Earn reputation.'}
             </p>
 
-            {/* GitHub OAuth */}
             <button 
               onClick={handleGithubLogin} 
               className="w-full py-3.5 bg-white/5 hover:bg-white/10 border border-white/10 rounded-xl flex items-center justify-center gap-3 text-sm font-bold text-white transition-all mb-6"
@@ -179,14 +207,12 @@ export default function VouchNetworkFeed() {
                <Github size={18}/> Continue with GitHub
             </button>
 
-            {/* Divider */}
             <div className="relative flex items-center py-2 mb-6">
                <div className="flex-grow border-t border-white/5"></div>
                <span className="flex-shrink-0 mx-4 text-[10px] text-gray-500 font-bold uppercase tracking-widest">OR</span>
                <div className="flex-grow border-t border-white/5"></div>
             </div>
 
-            {/* Email/Password Form */}
             <form onSubmit={handleEmailAuth} className="space-y-4">
                <div className="relative">
                  <Mail size={16} className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-500" />
@@ -226,7 +252,6 @@ export default function VouchNetworkFeed() {
                </button>
             </form>
 
-            {/* Toggle State */}
             <p className="text-xs text-gray-400 text-center mt-8">
               {isLoginView ? "Don't have an account? " : "Already have an account? "}
               <button 
@@ -244,7 +269,12 @@ export default function VouchNetworkFeed() {
     )
   }
 
-  // --- DYNAMIC SKILL CALCULATOR ---
+  // --- DYNAMIC SEARCH FILTER ---
+  const displayedProjects = projects.filter(p => 
+    p.title.toLowerCase().includes(searchQuery.toLowerCase()) || 
+    (p.tag && p.tag.toLowerCase().includes(searchQuery.toLowerCase()))
+  )
+
   const topSkills = Object.entries(
     projects.reduce((acc, proj) => {
       const skill = proj.tag || 'Protocol';
@@ -258,7 +288,44 @@ export default function VouchNetworkFeed() {
   .slice(0, 5);
 
   return (
-    <main className="min-h-screen bg-[#0A0D14] text-white font-sans selection:bg-blue-500/30">
+    <main className="min-h-screen bg-[#0A0D14] text-white font-sans selection:bg-blue-500/30 relative">
+      
+      {/* PROFILE EDIT MODAL */}
+      <AnimatePresence>
+        {isEditingProfile && (
+          <motion.div 
+            initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+            className="fixed inset-0 z-[100] bg-black/80 backdrop-blur-sm flex items-center justify-center p-4"
+          >
+            <motion.div 
+              initial={{ scale: 0.95, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} exit={{ scale: 0.95, opacity: 0 }}
+              className="bg-[#151821] border border-white/10 rounded-3xl p-6 sm:p-8 w-full max-w-md relative"
+            >
+              <button onClick={() => setIsEditingProfile(false)} className="absolute top-4 right-4 p-2 text-gray-400 hover:text-white bg-white/5 rounded-full"><X size={18} /></button>
+              <h2 className="text-xl font-bold text-white mb-6">Edit Profile</h2>
+              
+              <div className="space-y-4">
+                <div>
+                  <label className="text-xs font-bold text-gray-400 uppercase tracking-wider mb-2 block">Display Name</label>
+                  <input type="text" value={profileForm.full_name} onChange={(e) => setProfileForm({...profileForm, full_name: e.target.value})} className="w-full bg-[#0A0D14] border border-white/10 rounded-xl px-4 py-3 text-sm text-white outline-none focus:border-blue-500" />
+                </div>
+                <div>
+                  <label className="text-xs font-bold text-gray-400 uppercase tracking-wider mb-2 block">Bio</label>
+                  <input type="text" value={profileForm.bio} onChange={(e) => setProfileForm({...profileForm, bio: e.target.value})} className="w-full bg-[#0A0D14] border border-white/10 rounded-xl px-4 py-3 text-sm text-white outline-none focus:border-blue-500" />
+                </div>
+                <div>
+                  <label className="text-xs font-bold text-gray-400 uppercase tracking-wider mb-2 block">Avatar URL</label>
+                  <input type="text" value={profileForm.avatar_url} onChange={(e) => setProfileForm({...profileForm, avatar_url: e.target.value})} className="w-full bg-[#0A0D14] border border-white/10 rounded-xl px-4 py-3 text-sm text-white outline-none focus:border-blue-500" />
+                </div>
+                <button onClick={saveProfile} className="w-full py-3.5 bg-blue-600 hover:bg-blue-500 text-white font-bold rounded-xl mt-4 transition-colors">
+                  Save Changes
+                </button>
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
       {/* TOP NAVIGATION */}
       <nav className="sticky top-0 z-50 bg-[#0A0D14]/90 backdrop-blur-xl border-b border-white/5 px-4 md:px-8 py-4 flex items-center justify-between">
         <div className="flex items-center gap-3">
@@ -268,14 +335,51 @@ export default function VouchNetworkFeed() {
           <span className="text-xl font-bold tracking-tight hidden md:block">Vouch</span>
         </div>
 
+        {/* DYNAMIC SEARCH BAR */}
         <div className="hidden md:flex items-center bg-[#151821] rounded-full px-5 py-2.5 w-[500px] border border-white/5 focus-within:border-blue-500/50 transition-colors">
            <Search size={18} className="text-gray-500 mr-3" />
-           <input type="text" placeholder="Search projects, skills, or people..." className="bg-transparent border-none outline-none text-sm w-full text-white placeholder-gray-500" />
+           <input 
+             type="text" 
+             value={searchQuery}
+             onChange={(e) => setSearchQuery(e.target.value)}
+             placeholder="Search projects, skills, or people..." 
+             className="bg-transparent border-none outline-none text-sm w-full text-white placeholder-gray-500" 
+           />
         </div>
 
         <div className="flex items-center gap-6">
-           <Bell size={20} className="text-gray-400 hover:text-white cursor-pointer transition-colors" />
+           {/* NOTIFICATION PANEL */}
+           <div className="relative">
+             <Bell 
+               size={20} 
+               onClick={() => setShowNotifications(!showNotifications)}
+               className={`cursor-pointer transition-colors ${showNotifications ? 'text-white' : 'text-gray-400 hover:text-white'}`} 
+             />
+             {showNotifications && (
+               <div className="absolute top-8 right-0 w-80 bg-[#151821] border border-white/10 rounded-2xl shadow-2xl p-4 z-50">
+                 <h3 className="text-sm font-bold text-white mb-3">Notifications</h3>
+                 <div className="space-y-3">
+                   <div className="flex gap-3 items-start bg-white/5 p-3 rounded-xl">
+                     <div className="p-2 bg-blue-500/20 rounded-lg text-blue-400"><Heart size={14}/></div>
+                     <div>
+                       <p className="text-xs text-gray-300"><span className="text-white font-bold">Alex</span> vouched for your project <span className="text-blue-400">Vouch Network</span></p>
+                       <p className="text-[10px] text-gray-500 mt-1">2 hours ago</p>
+                     </div>
+                   </div>
+                   <div className="flex gap-3 items-start p-3 hover:bg-white/5 rounded-xl transition-colors">
+                     <div className="p-2 bg-purple-500/20 rounded-lg text-purple-400"><Trophy size={14}/></div>
+                     <div>
+                       <p className="text-xs text-gray-300">Your <span className="text-purple-400 font-bold">TypeScript</span> skill ranked up to #1!</p>
+                       <p className="text-[10px] text-gray-500 mt-1">1 day ago</p>
+                     </div>
+                   </div>
+                 </div>
+               </div>
+             )}
+           </div>
+           
            <MessageSquare size={20} className="text-gray-400 hover:text-white cursor-pointer transition-colors hidden sm:block" />
+           
            <div className="flex items-center gap-3 pl-4 border-l border-white/10">
               <img src={user.user_metadata?.avatar_url || 'https://www.gravatar.com/avatar/?d=mp'} className="w-9 h-9 rounded-full border border-white/10" alt="Avatar" />
               <form action={signOut}><button className="text-gray-500 hover:text-red-500 transition-colors"><LogOut size={18}/></button></form>
@@ -289,17 +393,26 @@ export default function VouchNetworkFeed() {
         {/* LEFT SIDEBAR */}
         <aside className="hidden lg:flex flex-col gap-6">
            
-           {/* Profile Header Card */}
+           {/* DYNAMIC PROFILE HEADER CARD */}
            <div className="bg-[#151821] rounded-3xl p-8 flex flex-col items-center relative border border-white/5 overflow-hidden group">
              <div className="absolute top-0 left-0 w-full h-24 bg-gradient-to-b from-blue-600/20 to-transparent" />
+             <button 
+               onClick={() => setIsEditingProfile(true)}
+               className="absolute top-4 right-4 p-2 bg-black/50 hover:bg-blue-600 rounded-full text-white/70 hover:text-white backdrop-blur-md transition-all z-20 opacity-0 group-hover:opacity-100"
+             >
+               <Edit2 size={14} />
+             </button>
+             
              <div className="w-24 h-24 rounded-full overflow-hidden border-4 border-[#151821] shadow-2xl relative z-10 mb-4 group-hover:scale-105 transition-transform">
                <img src={user.user_metadata?.avatar_url || 'https://www.gravatar.com/avatar/?d=mp'} className="w-full h-full object-cover" />
              </div>
              <div className="absolute top-24 right-1/2 translate-x-10 translate-y-2 bg-blue-500 rounded-full p-1 border-[3px] border-[#151821] z-20">
                <CheckCircle2 size={12} className="text-white" strokeWidth={4} />
              </div>
-             <h2 className="text-xl font-bold tracking-tight text-white text-center mt-2">{user.user_metadata?.full_name || user.user_metadata?.user_name || user.email.split('@')[0]}</h2>
-             <p className="text-sm text-gray-500 text-center mt-1">Building the future.</p>
+             <h2 className="text-xl font-bold tracking-tight text-white text-center mt-2 flex items-center gap-2">
+               {user.user_metadata?.full_name || user.user_metadata?.user_name || user.email.split('@')[0]}
+             </h2>
+             <p className="text-sm text-gray-500 text-center mt-1">{user.user_metadata?.bio || 'Building the future.'}</p>
            </div>
 
            {/* Top Vouched Skills Card */}
@@ -342,7 +455,6 @@ export default function VouchNetworkFeed() {
         {/* MAIN FEED */}
         <div className="col-span-1 lg:col-span-3 space-y-8">
            
-           {/* Feed Controls */}
            <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-4">
               <div className="flex bg-[#151821] p-1.5 rounded-2xl border border-white/5 w-fit">
                 <button className="flex items-center gap-2 px-6 py-2.5 bg-[#232733] rounded-xl text-sm font-semibold text-white shadow-sm border border-white/5">
@@ -359,8 +471,8 @@ export default function VouchNetworkFeed() {
 
            {/* Projects Feed */}
            <div className="space-y-6">
-              {projects.length > 0 ? (
-                projects.map((proj) => (
+              {displayedProjects.length > 0 ? (
+                displayedProjects.map((proj) => (
                   <FeedCard 
                     key={proj.id} 
                     {...proj} 
@@ -372,8 +484,14 @@ export default function VouchNetworkFeed() {
                 ))
               ) : (
                 <div className="bg-[#151821] border border-white/5 rounded-3xl p-16 text-center">
-                  <RefreshCw size={32} className="text-gray-600 mx-auto mb-4 animate-spin" />
-                  <p className="text-gray-400 font-medium">Syncing network protocols...</p>
+                  {searchQuery ? (
+                     <p className="text-gray-400 font-medium">No projects match "{searchQuery}"</p>
+                  ) : (
+                    <>
+                      <RefreshCw size={32} className="text-gray-600 mx-auto mb-4 animate-spin" />
+                      <p className="text-gray-400 font-medium">Syncing network protocols...</p>
+                    </>
+                  )}
                 </div>
               )}
            </div>
@@ -385,7 +503,10 @@ export default function VouchNetworkFeed() {
 }
 
 // FEED POST COMPONENT
-function FeedCard({ title, tag, desc, link, vouchCount, onVouch, vouched, author }) {
+function FeedCard({ title, tag, skills, desc, link, vouchCount, onVouch, vouched, author }) {
+  // Use dynamically generated skills array from GitHub, or fallback
+  const displaySkills = skills || [tag || 'Architecture', 'Protocol Design'];
+
   return (
     <motion.div 
       initial={{ opacity: 0, y: 20 }} 
@@ -411,11 +532,13 @@ function FeedCard({ title, tag, desc, link, vouchCount, onVouch, vouched, author
       <h2 className="text-2xl sm:text-3xl font-bold text-white mb-3 tracking-tight">{title}</h2>
       <p className="text-gray-400 text-sm sm:text-base leading-relaxed mb-6 max-w-3xl">{desc}</p>
 
-      {/* Skill Tags */}
+      {/* DYNAMIC SKILL TAGS */}
       <div className="flex gap-2 mb-8 flex-wrap">
-         <span className="px-4 py-1.5 bg-white/5 border border-white/5 rounded-full text-xs text-gray-300 font-medium hover:bg-white/10 cursor-pointer transition-colors">
-            {tag || 'Architecture'}
-         </span>
+         {displaySkills.map((skill, index) => (
+           <span key={index} className="px-4 py-1.5 bg-white/5 border border-white/5 rounded-full text-xs text-gray-300 font-medium hover:bg-white/10 cursor-pointer transition-colors">
+              {skill}
+           </span>
+         ))}
       </div>
 
       {/* Media Preview (Generative Placeholder) */}
