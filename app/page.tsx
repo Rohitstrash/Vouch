@@ -8,7 +8,7 @@ import { motion, AnimatePresence } from 'framer-motion'
 import { 
   Search, Bell, MessageSquare, Flame, Clock, Filter, 
   CheckCircle2, MoreHorizontal, Sparkles, Trophy, 
-  Github, LogOut, Heart, Plus, Zap, RefreshCw, ExternalLink
+  Github, LogOut, Heart, Plus, Zap, RefreshCw, ExternalLink, ArrowRight, Mail
 } from 'lucide-react'
 import { signOut } from './actions'
 
@@ -19,6 +19,12 @@ export default function VouchNetworkFeed() {
   const [projects, setProjects] = useState([])
   const [vouchedIds, setVouchedIds] = useState([]) 
   const [globalVouchCounts, setGlobalVouchCounts] = useState({})
+
+  // Auth States
+  const [email, setEmail] = useState('')
+  const [password, setPassword] = useState('')
+  const [isLoginView, setIsLoginView] = useState(false)
+  const [authMsg, setAuthMsg] = useState({ text: '', type: '' })
 
   const supabase = createBrowserClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL || '',
@@ -112,26 +118,128 @@ export default function VouchNetworkFeed() {
     } catch (e) {}
   }
 
-  const handleLogin = () => {
+  const handleGithubLogin = () => {
     supabase.auth.signInWithOAuth({ 
       provider: 'github', 
       options: { redirectTo: `${window.location.origin}/auth/callback`, scopes: 'repo read:user' } 
     })
   }
 
+  const handleEmailAuth = async (e) => {
+    e.preventDefault()
+    setAuthMsg({ text: 'Processing...', type: 'info' })
+    
+    if (isLoginView) {
+      const { error } = await supabase.auth.signInWithPassword({ email, password })
+      if (error) setAuthMsg({ text: error.message, type: 'error' })
+      else window.location.reload() // Successful login
+    } else {
+      const { error } = await supabase.auth.signUp({ 
+        email, 
+        password,
+        options: { emailRedirectTo: `${window.location.origin}/auth/callback` }
+      })
+      if (error) setAuthMsg({ text: error.message, type: 'error' })
+      else setAuthMsg({ text: 'Success! Check your email to confirm your account.', type: 'success' })
+    }
+  }
+
   if (loading) return <div className="h-screen bg-[#0A0D14] flex items-center justify-center text-blue-500 animate-pulse font-bold text-2xl">Initializing Network...</div>
 
+  // --- NEW LOGIN UI ---
   if (!user) {
     return (
-      <div className="h-screen bg-[#0A0D14] flex flex-col items-center justify-center text-white px-4">
-         <div className="w-16 h-16 bg-blue-600 rounded-2xl flex items-center justify-center mb-8 shadow-2xl shadow-blue-500/20">
-            <CheckCircle2 size={32} className="text-white" />
-         </div>
-         <h1 className="text-5xl font-black tracking-tight mb-4">Vouch Network</h1>
-         <p className="text-gray-400 mb-10 text-center max-w-sm">The professional network for builders. Verify your skills, build your reputation.</p>
-         <button onClick={handleLogin} className="px-8 py-4 bg-white text-black font-bold rounded-full hover:scale-105 transition-transform flex items-center gap-3">
-            <Github size={20}/> Continue with GitHub
-         </button>
+      <div className="min-h-screen bg-[#0A0D14] flex flex-col items-center justify-center p-4 relative overflow-hidden">
+         {/* Background Glow */}
+         <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[600px] h-[600px] bg-blue-600/10 blur-[120px] rounded-full pointer-events-none" />
+         
+         <motion.div 
+           initial={{ opacity: 0, y: 20 }}
+           animate={{ opacity: 1, y: 0 }}
+           className="w-full max-w-[400px] bg-[#151821] border border-white/5 rounded-[2.5rem] p-8 sm:p-10 shadow-2xl shadow-black/50 relative z-10"
+         >
+            {/* Logo */}
+            <div className="w-14 h-14 bg-blue-600 rounded-2xl flex items-center justify-center mx-auto mb-6 shadow-[0_0_30px_rgba(37,99,235,0.4)]">
+               <CheckCircle2 size={28} className="text-white" strokeWidth={2.5} />
+            </div>
+
+            {/* Header */}
+            <h1 className="text-2xl font-black text-white text-center tracking-tight mb-2">
+              {isLoginView ? 'Welcome Back' : 'Join Vouch'}
+            </h1>
+            <p className="text-sm text-gray-400 text-center mb-8">
+              {isLoginView ? 'Sign in to continue.' : 'Showcase projects. Earn reputation.'}
+            </p>
+
+            {/* GitHub OAuth */}
+            <button 
+              onClick={handleGithubLogin} 
+              className="w-full py-3.5 bg-white/5 hover:bg-white/10 border border-white/10 rounded-xl flex items-center justify-center gap-3 text-sm font-bold text-white transition-all mb-6"
+            >
+               <Github size={18}/> Continue with GitHub
+            </button>
+
+            {/* Divider */}
+            <div className="relative flex items-center py-2 mb-6">
+               <div className="flex-grow border-t border-white/5"></div>
+               <span className="flex-shrink-0 mx-4 text-[10px] text-gray-500 font-bold uppercase tracking-widest">OR</span>
+               <div className="flex-grow border-t border-white/5"></div>
+            </div>
+
+            {/* Email/Password Form */}
+            <form onSubmit={handleEmailAuth} className="space-y-4">
+               <div className="relative">
+                 <Mail size={16} className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-500" />
+                 <input 
+                   type="email" 
+                   required
+                   value={email}
+                   onChange={(e) => setEmail(e.target.value)}
+                   placeholder="Enter your email" 
+                   className="w-full bg-[#0A0D14] border border-white/5 rounded-xl pl-11 pr-4 py-3.5 text-sm text-white placeholder-gray-600 outline-none focus:border-blue-500/50 focus:ring-1 focus:ring-blue-500/50 transition-all"
+                 />
+               </div>
+               <div className="relative">
+                 <Zap size={16} className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-500" />
+                 <input 
+                   type="password" 
+                   required
+                   value={password}
+                   onChange={(e) => setPassword(e.target.value)}
+                   placeholder="Choose a password" 
+                   className="w-full bg-[#0A0D14] border border-white/5 rounded-xl pl-11 pr-4 py-3.5 text-sm text-white placeholder-gray-600 outline-none focus:border-blue-500/50 focus:ring-1 focus:ring-blue-500/50 transition-all"
+                 />
+               </div>
+
+               {authMsg.text && (
+                 <p className={`text-xs font-medium text-center ${authMsg.type === 'error' ? 'text-red-400' : authMsg.type === 'success' ? 'text-green-400' : 'text-blue-400'}`}>
+                   {authMsg.text}
+                 </p>
+               )}
+
+               <button 
+                 type="submit" 
+                 className="w-full py-3.5 mt-2 bg-gradient-to-r from-blue-500 to-purple-500 hover:from-blue-400 hover:to-purple-400 rounded-xl text-sm font-bold text-white shadow-lg shadow-blue-500/25 transition-all flex justify-center items-center gap-2 group"
+               >
+                  {isLoginView ? 'Log In' : 'Create Account'} 
+                  <ArrowRight size={16} className="group-hover:translate-x-1 transition-transform" />
+               </button>
+            </form>
+
+            {/* Toggle State */}
+            <p className="text-xs text-gray-400 text-center mt-8">
+              {isLoginView ? "Don't have an account? " : "Already have an account? "}
+              <button 
+                onClick={() => {
+                  setIsLoginView(!isLoginView)
+                  setAuthMsg({text: '', type: ''})
+                }} 
+                className="text-blue-400 font-bold hover:text-blue-300"
+              >
+                {isLoginView ? 'Sign up' : 'Log in'}
+              </button>
+            </p>
+         </motion.div>
       </div>
     )
   }
@@ -139,19 +247,14 @@ export default function VouchNetworkFeed() {
   // --- DYNAMIC SKILL CALCULATOR ---
   const topSkills = Object.entries(
     projects.reduce((acc, proj) => {
-      // Get the skill tag (default to 'Protocol' if missing)
       const skill = proj.tag || 'Protocol';
-      // Get the actual vouch count for this project from the database
       const score = globalVouchCounts[proj.id] || 0; 
-      
       acc[skill] = (acc[skill] || 0) + score;
       return acc;
     }, {})
   )
   .map(([name, count]) => ({ name, count }))
-  // Sort from highest score to lowest
   .sort((a, b) => b.count - a.count)
-  // Only keep the top 5 for the sidebar
   .slice(0, 5);
 
   return (
@@ -174,7 +277,7 @@ export default function VouchNetworkFeed() {
            <Bell size={20} className="text-gray-400 hover:text-white cursor-pointer transition-colors" />
            <MessageSquare size={20} className="text-gray-400 hover:text-white cursor-pointer transition-colors hidden sm:block" />
            <div className="flex items-center gap-3 pl-4 border-l border-white/10">
-              <img src={user.user_metadata.avatar_url} className="w-9 h-9 rounded-full border border-white/10" alt="Avatar" />
+              <img src={user.user_metadata?.avatar_url || 'https://www.gravatar.com/avatar/?d=mp'} className="w-9 h-9 rounded-full border border-white/10" alt="Avatar" />
               <form action={signOut}><button className="text-gray-500 hover:text-red-500 transition-colors"><LogOut size={18}/></button></form>
            </div>
         </div>
@@ -190,12 +293,12 @@ export default function VouchNetworkFeed() {
            <div className="bg-[#151821] rounded-3xl p-8 flex flex-col items-center relative border border-white/5 overflow-hidden group">
              <div className="absolute top-0 left-0 w-full h-24 bg-gradient-to-b from-blue-600/20 to-transparent" />
              <div className="w-24 h-24 rounded-full overflow-hidden border-4 border-[#151821] shadow-2xl relative z-10 mb-4 group-hover:scale-105 transition-transform">
-               <img src={user.user_metadata.avatar_url} className="w-full h-full object-cover" />
+               <img src={user.user_metadata?.avatar_url || 'https://www.gravatar.com/avatar/?d=mp'} className="w-full h-full object-cover" />
              </div>
              <div className="absolute top-24 right-1/2 translate-x-10 translate-y-2 bg-blue-500 rounded-full p-1 border-[3px] border-[#151821] z-20">
                <CheckCircle2 size={12} className="text-white" strokeWidth={4} />
              </div>
-             <h2 className="text-xl font-bold tracking-tight text-white text-center mt-2">{user.user_metadata.full_name || user.user_metadata.user_name}</h2>
+             <h2 className="text-xl font-bold tracking-tight text-white text-center mt-2">{user.user_metadata?.full_name || user.user_metadata?.user_name || user.email.split('@')[0]}</h2>
              <p className="text-sm text-gray-500 text-center mt-1">Building the future.</p>
            </div>
 
@@ -262,7 +365,7 @@ export default function VouchNetworkFeed() {
                     key={proj.id} 
                     {...proj} 
                     author={user.user_metadata}
-                    vouchCount={globalVouchCounts[proj.id] || 0} // Using exact count now
+                    vouchCount={globalVouchCounts[proj.id] || 0}
                     vouched={vouchedIds.includes(proj.id)}
                     onVouch={() => handleVouch(proj.id)} 
                   />
@@ -292,10 +395,10 @@ function FeedCard({ title, tag, desc, link, vouchCount, onVouch, vouched, author
       {/* Post Header */}
       <div className="flex justify-between items-start mb-6">
          <div className="flex items-center gap-4">
-            <img src={author.avatar_url} className="w-12 h-12 rounded-full border border-white/10" alt="Author" />
+            <img src={author?.avatar_url || 'https://www.gravatar.com/avatar/?d=mp'} className="w-12 h-12 rounded-full border border-white/10" alt="Author" />
             <div>
               <div className="flex items-center gap-1.5">
-                <h4 className="font-bold text-white tracking-tight">{author.full_name || author.user_name}</h4>
+                <h4 className="font-bold text-white tracking-tight">{author?.full_name || author?.user_name || 'Builder'}</h4>
                 <CheckCircle2 size={16} className="text-blue-500" strokeWidth={3} />
               </div>
               <p className="text-xs text-gray-500 font-medium mt-0.5">Software Engineer • 2 hours ago</p>
@@ -313,26 +416,18 @@ function FeedCard({ title, tag, desc, link, vouchCount, onVouch, vouched, author
          <span className="px-4 py-1.5 bg-white/5 border border-white/5 rounded-full text-xs text-gray-300 font-medium hover:bg-white/10 cursor-pointer transition-colors">
             {tag || 'Architecture'}
          </span>
-         <span className="px-4 py-1.5 bg-white/5 border border-white/5 rounded-full text-xs text-gray-300 font-medium hover:bg-white/10 cursor-pointer transition-colors">
-            TypeScript
-         </span>
-         <span className="px-4 py-1.5 bg-white/5 border border-white/5 rounded-full text-xs text-gray-300 font-medium hover:bg-white/10 cursor-pointer transition-colors">
-            Protocol Design
-         </span>
       </div>
 
       {/* Media Preview (Generative Placeholder) */}
       <a href={link} target="_blank" rel="noopener noreferrer" className="block relative group overflow-hidden rounded-2xl mb-6 border border-white/5 bg-[#0A0D14]">
          <div className="absolute inset-0 bg-gradient-to-t from-[#0A0D14] to-transparent z-10 opacity-60 group-hover:opacity-40 transition-opacity" />
          
-         {/* Abstract Geometric Pattern Background */}
          <div className="w-full h-64 sm:h-80 bg-gradient-to-br from-blue-900/20 via-[#151821] to-purple-900/20 flex flex-col items-center justify-center relative overflow-hidden">
             <div className="absolute w-[500px] h-[500px] bg-blue-500/10 blur-[100px] rounded-full -top-1/2 -left-1/4 group-hover:bg-blue-500/20 transition-colors duration-700" />
             <Github size={48} className="text-white/10 mb-4 z-20" />
             <span className="font-mono text-white/20 text-3xl font-black tracking-widest uppercase z-20">{title.substring(0, 3)}</span>
          </div>
          
-         {/* Link Overlay */}
          <div className="absolute bottom-4 right-4 z-20 bg-white/10 backdrop-blur-md px-4 py-2 rounded-xl border border-white/10 flex items-center gap-2 opacity-0 group-hover:opacity-100 transition-all translate-y-2 group-hover:translate-y-0">
             <span className="text-xs font-bold text-white">View Source</span>
             <ExternalLink size={14} className="text-white"/>
