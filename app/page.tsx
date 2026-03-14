@@ -348,44 +348,63 @@ export default function VouchNetworkFeed() {
         </div>
 
         <div className="flex items-center gap-6">
-           {/* NOTIFICATION PANEL */}
-           <div className="relative">
-             <Bell 
-               size={20} 
-               onClick={() => setShowNotifications(!showNotifications)}
-               className={`cursor-pointer transition-colors ${showNotifications ? 'text-white' : 'text-gray-400 hover:text-white'}`} 
-             />
-             {showNotifications && (
-               <div className="absolute top-8 right-0 w-80 bg-[#151821] border border-white/10 rounded-2xl shadow-2xl p-4 z-50">
-                 <h3 className="text-sm font-bold text-white mb-3">Notifications</h3>
-                 <div className="space-y-3">
-                   <div className="flex gap-3 items-start bg-white/5 p-3 rounded-xl">
-                     <div className="p-2 bg-blue-500/20 rounded-lg text-blue-400"><Heart size={14}/></div>
-                     <div>
-                       <p className="text-xs text-gray-300"><span className="text-white font-bold">Alex</span> vouched for your project <span className="text-blue-400">Vouch Network</span></p>
-                       <p className="text-[10px] text-gray-500 mt-1">2 hours ago</p>
-                     </div>
-                   </div>
-                   <div className="flex gap-3 items-start p-3 hover:bg-white/5 rounded-xl transition-colors">
-                     <div className="p-2 bg-purple-500/20 rounded-lg text-purple-400"><Trophy size={14}/></div>
-                     <div>
-                       <p className="text-xs text-gray-300">Your <span className="text-purple-400 font-bold">TypeScript</span> skill ranked up to #1!</p>
-                       <p className="text-[10px] text-gray-500 mt-1">1 day ago</p>
-                     </div>
-                   </div>
-                 </div>
-               </div>
-             )}
+      {/* NOTIFICATION PANEL */}
+      <div className="relative">
+        <Bell 
+          size={20} 
+          onClick={() => setShowNotifications(!showNotifications)}
+          className={`cursor-pointer transition-colors ${showNotifications ? 'text-white' : 'text-gray-400 hover:text-white'}`} 
+        />
+        {showNotifications && (
+          <div className="absolute top-8 right-0 w-80 bg-[#151821] border border-white/10 rounded-2xl shadow-2xl p-4 z-50">
+            <h3 className="text-sm font-bold text-white mb-3">Notifications</h3>
+            <div className="space-y-3">
+              <div className="flex gap-3 items-start bg-white/5 p-3 rounded-xl">
+                <div className="p-2 bg-blue-500/20 rounded-lg text-blue-400"><Heart size={14}/></div>
+                <div>
+                  <p className="text-xs text-gray-300"><span className="text-white font-bold">Alex</span> vouched for your project <span className="text-blue-400">Vouch Network</span></p>
+                  <p className="text-[10px] text-gray-500 mt-1">2 hours ago</p>
+                </div>
+              </div>
+              <div className="flex gap-3 items-start p-3 hover:bg-white/5 rounded-xl transition-colors">
+                <div className="p-2 bg-purple-500/20 rounded-lg text-purple-400"><Trophy size={14}/></div>
+                <div>
+                  <p className="text-xs text-gray-300">Your <span className="text-purple-400 font-bold">TypeScript</span> skill ranked up to #1!</p>
+                  <p className="text-[10px] text-gray-500 mt-1">1 day ago</p>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+      </div>
+      
+      <MessageSquare size={20} className="text-gray-400 hover:text-white cursor-pointer transition-colors hidden sm:block" />
+      
+      {/* UPDATED: CLICKABLE PROFILE PICTURE FOR MOBILE */}
+      <div className="flex items-center gap-3 pl-4 border-l border-white/10">
+         <button 
+           onClick={() => setIsEditingProfile(true)}
+           className="relative group rounded-full overflow-hidden border border-white/10 focus:ring-2 focus:ring-blue-500 transition-all"
+         >
+           <img 
+             src={user.user_metadata?.avatar_url || 'https://www.gravatar.com/avatar/?d=mp'} 
+             className="w-9 h-9 object-cover" 
+             alt="Edit Profile" 
+           />
+           <div className="absolute inset-0 bg-black/60 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-all">
+             <Edit2 size={12} className="text-white" />
            </div>
-           
-           <MessageSquare size={20} className="text-gray-400 hover:text-white cursor-pointer transition-colors hidden sm:block" />
-           
-           <div className="flex items-center gap-3 pl-4 border-l border-white/10">
-              <img src={user.user_metadata?.avatar_url || 'https://www.gravatar.com/avatar/?d=mp'} className="w-9 h-9 rounded-full border border-white/10" alt="Avatar" />
-              <form action={signOut}><button className="text-gray-500 hover:text-red-500 transition-colors"><LogOut size={18}/></button></form>
-           </div>
-        </div>
-      </nav>
+         </button>
+         
+         <form action={signOut}>
+           <button type="submit" className="text-gray-500 hover:text-red-500 transition-colors mt-1">
+             <LogOut size={18}/>
+           </button>
+         </form>
+      </div>
+   </div>
+</nav>
+
 
       {/* MAIN LAYOUT GRID */}
       <div className="max-w-[1400px] mx-auto px-4 md:px-8 pt-10 pb-20 grid grid-cols-1 lg:grid-cols-4 gap-8">
