@@ -9,9 +9,29 @@ import {
   Search, Bell, MessageSquare, Flame, Clock, Filter, 
   CheckCircle2, MoreHorizontal, Sparkles, Trophy, 
   Github, LogOut, Heart, Plus, Zap, RefreshCw, ExternalLink, ArrowRight, Mail,
-  Edit2, X
+  Edit2, X, Save, ImageIcon
 } from 'lucide-react'
 import { signOut } from './actions'
+
+// --- HELPER FUNCTION: REALTIME TIME AGO ---
+function timeAgo(dateString) {
+  if (!dateString) return "Unknown time";
+  const date = new Date(dateString);
+  const now = new Date();
+  const seconds = Math.floor((now - date) / 1000);
+
+  let interval = seconds / 31536000;
+  if (interval > 1) return Math.floor(interval) + " years ago";
+  interval = seconds / 2592000;
+  if (interval > 1) return Math.floor(interval) + " months ago";
+  interval = seconds / 86400;
+  if (interval > 1) return Math.floor(interval) + " days ago";
+  interval = seconds / 3600;
+  if (interval > 1) return Math.floor(interval) + " hours ago";
+  interval = seconds / 60;
+  if (interval > 1) return Math.floor(interval) + " minutes ago";
+  return Math.floor(seconds) + " seconds ago";
+}
 
 export default function VouchNetworkFeed() {
   const [user, setUser] = useState(null)
@@ -32,6 +52,11 @@ export default function VouchNetworkFeed() {
   const [showNotifications, setShowNotifications] = useState(false)
   const [isEditingProfile, setIsEditingProfile] = useState(false)
   const [profileForm, setProfileForm] = useState({ full_name: '', bio: '', avatar_url: '' })
+
+  // --- EDITABLE DESIGNATION STATES ---
+  const [designation, setDesignation] = useState('')
+  const [tempDesignation, setTempDesignation] = useState('')
+  const [isEditingDesignation, setIsEditingDesignation] = useState(false)
 
   const supabase = createBrowserClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL || '',
@@ -58,6 +83,7 @@ export default function VouchNetworkFeed() {
             bio: session.user.user_metadata?.bio || 'Building the future.',
             avatar_url: session.user.user_metadata?.avatar_url || 'https://www.gravatar.com/avatar/?d=mp'
           })
+          setDesignation(session.user.user_metadata?.designation || 'Software Engineer')
           
           const { data: myVouches } = await supabase.from('vouches').select('project_id').eq('voucher_id', session.user.id)
           if (myVouches) setVouchedIds(myVouches.map(v => v.project_id))
@@ -106,10 +132,11 @@ export default function VouchNetworkFeed() {
           platform: 'github',
           title: repo.name,
           tag: repo.language || 'Protocol',
-          // Creating dynamic skills array based on language
           skills: [repo.language, 'Architecture', 'Open Source'].filter(Boolean), 
           desc: repo.description || 'Verified via GitHub Sync. Building scalable solutions.',
           link: repo.html_url,
+          createdAt: repo.pushed_at, // Dynamic time setup
+          image_url: null, // Dynamic image setup
           difficulty_weight: 1 
         }))
         
@@ -174,6 +201,31 @@ export default function VouchNetworkFeed() {
       setIsEditingProfile(false) // Close modal
     } catch (error) {
       alert("Error updating profile: " + error.message)
+    }
+  }
+
+  // --- SAVE UPDATED DESIGNATION ---
+  const handleSaveDesignation = async () => {
+    try {
+      const { error } = await supabase.auth.updateUser({
+        data: { designation: tempDesignation }
+      })
+      if (error) throw error
+      setDesignation(tempDesignation)
+      setIsEditingDesignation(false)
+    } catch (error) {
+      alert("Error updating designation: " + error.message)
+    }
+  }
+
+  // --- UPDATE PROJECT IN SUPABASE ---
+  const updateProjectInDb = async (projectId, updates) => {
+    try {
+      const { error } = await supabase.from('projects').update(updates).eq('id', projectId)
+      if (error) throw error
+      setProjects(prev => prev.map(p => p.id === projectId ? { ...p, ...updates } : p))
+    } catch (error) {
+      alert("Error updating project: " + error.message)
     }
   }
 
@@ -348,63 +400,62 @@ export default function VouchNetworkFeed() {
         </div>
 
         <div className="flex items-center gap-6">
-      {/* NOTIFICATION PANEL */}
-      <div className="relative">
-        <Bell 
-          size={20} 
-          onClick={() => setShowNotifications(!showNotifications)}
-          className={`cursor-pointer transition-colors ${showNotifications ? 'text-white' : 'text-gray-400 hover:text-white'}`} 
-        />
-        {showNotifications && (
-          <div className="absolute top-8 right-0 w-80 bg-[#151821] border border-white/10 rounded-2xl shadow-2xl p-4 z-50">
-            <h3 className="text-sm font-bold text-white mb-3">Notifications</h3>
-            <div className="space-y-3">
-              <div className="flex gap-3 items-start bg-white/5 p-3 rounded-xl">
-                <div className="p-2 bg-blue-500/20 rounded-lg text-blue-400"><Heart size={14}/></div>
-                <div>
-                  <p className="text-xs text-gray-300"><span className="text-white font-bold">Alex</span> vouched for your project <span className="text-blue-400">Vouch Network</span></p>
-                  <p className="text-[10px] text-gray-500 mt-1">2 hours ago</p>
+          {/* NOTIFICATION PANEL */}
+          <div className="relative">
+            <Bell 
+              size={20} 
+              onClick={() => setShowNotifications(!showNotifications)}
+              className={`cursor-pointer transition-colors ${showNotifications ? 'text-white' : 'text-gray-400 hover:text-white'}`} 
+            />
+            {showNotifications && (
+              <div className="absolute top-8 right-0 w-80 bg-[#151821] border border-white/10 rounded-2xl shadow-2xl p-4 z-50">
+                <h3 className="text-sm font-bold text-white mb-3">Notifications</h3>
+                <div className="space-y-3">
+                  <div className="flex gap-3 items-start bg-white/5 p-3 rounded-xl">
+                    <div className="p-2 bg-blue-500/20 rounded-lg text-blue-400"><Heart size={14}/></div>
+                    <div>
+                      <p className="text-xs text-gray-300"><span className="text-white font-bold">Alex</span> vouched for your project <span className="text-blue-400">Vouch Network</span></p>
+                      <p className="text-[10px] text-gray-500 mt-1">2 hours ago</p>
+                    </div>
+                  </div>
+                  <div className="flex gap-3 items-start p-3 hover:bg-white/5 rounded-xl transition-colors">
+                    <div className="p-2 bg-purple-500/20 rounded-lg text-purple-400"><Trophy size={14}/></div>
+                    <div>
+                      <p className="text-xs text-gray-300">Your <span className="text-purple-400 font-bold">TypeScript</span> skill ranked up to #1!</p>
+                      <p className="text-[10px] text-gray-500 mt-1">1 day ago</p>
+                    </div>
+                  </div>
                 </div>
               </div>
-              <div className="flex gap-3 items-start p-3 hover:bg-white/5 rounded-xl transition-colors">
-                <div className="p-2 bg-purple-500/20 rounded-lg text-purple-400"><Trophy size={14}/></div>
-                <div>
-                  <p className="text-xs text-gray-300">Your <span className="text-purple-400 font-bold">TypeScript</span> skill ranked up to #1!</p>
-                  <p className="text-[10px] text-gray-500 mt-1">1 day ago</p>
-                </div>
-              </div>
-            </div>
+            )}
           </div>
-        )}
-      </div>
-      
-      <MessageSquare size={20} className="text-gray-400 hover:text-white cursor-pointer transition-colors hidden sm:block" />
-      
-      {/* UPDATED: CLICKABLE PROFILE PICTURE FOR MOBILE */}
-      <div className="flex items-center gap-3 pl-4 border-l border-white/10">
-         <button 
-           onClick={() => setIsEditingProfile(true)}
-           className="relative group rounded-full overflow-hidden border border-white/10 focus:ring-2 focus:ring-blue-500 transition-all"
-         >
-           <img 
-             src={user.user_metadata?.avatar_url || 'https://www.gravatar.com/avatar/?d=mp'} 
-             className="w-9 h-9 object-cover" 
-             alt="Edit Profile" 
-           />
-           <div className="absolute inset-0 bg-black/60 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-all">
-             <Edit2 size={12} className="text-white" />
-           </div>
-         </button>
-         
-         <form action={signOut}>
-           <button type="submit" className="text-gray-500 hover:text-red-500 transition-colors mt-1">
-             <LogOut size={18}/>
-           </button>
-         </form>
-      </div>
-   </div>
-</nav>
-
+          
+          <MessageSquare size={20} className="text-gray-400 hover:text-white cursor-pointer transition-colors hidden sm:block" />
+          
+          {/* CLICKABLE PROFILE PICTURE FOR MOBILE */}
+          <div className="flex items-center gap-3 pl-4 border-l border-white/10">
+             <button 
+               onClick={() => setIsEditingProfile(true)}
+               className="relative group rounded-full overflow-hidden border border-white/10 focus:ring-2 focus:ring-blue-500 transition-all"
+             >
+               <img 
+                 src={user.user_metadata?.avatar_url || 'https://www.gravatar.com/avatar/?d=mp'} 
+                 className="w-9 h-9 object-cover" 
+                 alt="Edit Profile" 
+               />
+               <div className="absolute inset-0 bg-black/60 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-all">
+                 <Edit2 size={12} className="text-white" />
+               </div>
+             </button>
+             
+             <form action={signOut}>
+               <button type="submit" className="text-gray-500 hover:text-red-500 transition-colors mt-1">
+                 <LogOut size={18}/>
+               </button>
+             </form>
+          </div>
+       </div>
+      </nav>
 
       {/* MAIN LAYOUT GRID */}
       <div className="max-w-[1400px] mx-auto px-4 md:px-8 pt-10 pb-20 grid grid-cols-1 lg:grid-cols-4 gap-8">
@@ -431,7 +482,33 @@ export default function VouchNetworkFeed() {
              <h2 className="text-xl font-bold tracking-tight text-white text-center mt-2 flex items-center gap-2">
                {user.user_metadata?.full_name || user.user_metadata?.user_name || user.email.split('@')[0]}
              </h2>
-             <p className="text-sm text-gray-500 text-center mt-1">{user.user_metadata?.bio || 'Building the future.'}</p>
+             
+             {/* EDITABLE DESIGNATION */}
+             <div className="relative mt-1 group w-full flex justify-center">
+                {isEditingDesignation ? (
+                  <div className="flex items-center gap-1.5 bg-[#0A0D14] border border-white/10 rounded-lg p-1">
+                    <input 
+                      type="text" 
+                      value={tempDesignation}
+                      onChange={(e) => setTempDesignation(e.target.value)}
+                      className="bg-transparent border-none outline-none text-sm text-white px-2 py-0.5 w-40 text-center"
+                      autoFocus
+                    />
+                    <button onClick={handleSaveDesignation} className="p-1 text-green-400 hover:text-green-300"><Save size={14} /></button>
+                    <button onClick={() => setIsEditingDesignation(false)} className="p-1 text-red-400 hover:text-red-300"><X size={14} /></button>
+                  </div>
+                ) : (
+                  <>
+                    <p className="text-sm text-gray-500 text-center">{designation}</p>
+                    <button 
+                      onClick={() => { setTempDesignation(designation); setIsEditingDesignation(true); }}
+                      className="absolute right-0 top-1/2 -translate-y-1/2 p-1 text-gray-600 hover:text-white bg-white/5 rounded-full opacity-0 group-hover:opacity-100 transition-all"
+                    >
+                      <Edit2 size={12} />
+                    </button>
+                  </>
+                )}
+             </div>
            </div>
 
            {/* Top Vouched Skills Card */}
@@ -496,9 +573,11 @@ export default function VouchNetworkFeed() {
                     key={proj.id} 
                     {...proj} 
                     author={user.user_metadata}
+                    userDesignation={designation}
                     vouchCount={globalVouchCounts[proj.id] || 0}
                     vouched={vouchedIds.includes(proj.id)}
-                    onVouch={() => handleVouch(proj.id)} 
+                    onVouch={() => handleVouch(proj.id)}
+                    onUpdateProject={updateProjectInDb}
                   />
                 ))
               ) : (
@@ -522,9 +601,23 @@ export default function VouchNetworkFeed() {
 }
 
 // FEED POST COMPONENT
-function FeedCard({ title, tag, skills, desc, link, vouchCount, onVouch, vouched, author }) {
-  // Use dynamically generated skills array from GitHub, or fallback
-  const displaySkills = skills || [tag || 'Architecture', 'Protocol Design'];
+function FeedCard({ id, title, tag, skills, desc, link, vouchCount, onVouch, vouched, author, userDesignation, createdAt, image_url, onUpdateProject }) {
+  // New States for local editing
+  const [isEditingTags, setIsEditingTags] = useState(false);
+  const [tempTags, setTempTags] = useState(skills?.join(', ') || tag);
+  const [isEditingImage, setIsEditingImage] = useState(false);
+  const [tempImageUrl, setTempImageUrl] = useState(image_url || '');
+
+  const saveTags = async () => {
+    const newSkills = tempTags.split(',').map(s => s.trim()).filter(Boolean);
+    await onUpdateProject(id, { skills: newSkills, tag: newSkills[0] || 'Protocol' });
+    setIsEditingTags(false);
+  }
+
+  const saveImage = async () => {
+    await onUpdateProject(id, { image_url: tempImageUrl });
+    setIsEditingImage(false);
+  }
 
   return (
     <motion.div 
@@ -541,7 +634,9 @@ function FeedCard({ title, tag, skills, desc, link, vouchCount, onVouch, vouched
                 <h4 className="font-bold text-white tracking-tight">{author?.full_name || author?.user_name || 'Builder'}</h4>
                 <CheckCircle2 size={16} className="text-blue-500" strokeWidth={3} />
               </div>
-              <p className="text-xs text-gray-500 font-medium mt-0.5">Software Engineer • 2 hours ago</p>
+              <p className="text-xs text-gray-500 font-medium mt-0.5">
+                {userDesignation} • {timeAgo(createdAt)}
+              </p>
             </div>
          </div>
          <button className="text-gray-500 hover:text-white p-2"><MoreHorizontal size={20}/></button>
@@ -551,30 +646,90 @@ function FeedCard({ title, tag, skills, desc, link, vouchCount, onVouch, vouched
       <h2 className="text-2xl sm:text-3xl font-bold text-white mb-3 tracking-tight">{title}</h2>
       <p className="text-gray-400 text-sm sm:text-base leading-relaxed mb-6 max-w-3xl">{desc}</p>
 
-      {/* DYNAMIC SKILL TAGS */}
-      <div className="flex gap-2 mb-8 flex-wrap">
-         {displaySkills.map((skill, index) => (
-           <span key={index} className="px-4 py-1.5 bg-white/5 border border-white/5 rounded-full text-xs text-gray-300 font-medium hover:bg-white/10 cursor-pointer transition-colors">
-              {skill}
-           </span>
-         ))}
+      {/* EDITABLE SKILL TAGS */}
+      <div className="flex items-center gap-2 mb-8 group relative flex-wrap">
+          {isEditingTags ? (
+              <div className="flex items-center gap-2 bg-[#0A0D14] border border-white/10 rounded-lg p-1.5 w-full max-w-lg">
+                <input 
+                  type="text" 
+                  value={tempTags}
+                  onChange={(e) => setTempTags(e.target.value)}
+                  placeholder="Comma-separated skills..."
+                  className="bg-transparent border-none outline-none text-xs text-white px-2 py-0.5 w-full"
+                  autoFocus
+                />
+                <button onClick={saveTags} className="p-1 text-green-400 hover:text-green-300"><Save size={14} /></button>
+                <button onClick={() => setIsEditingTags(false)} className="p-1 text-red-400 hover:text-red-300"><X size={14} /></button>
+              </div>
+          ) : (
+            <>
+                {skills && skills.length > 0 ? (
+                    skills.map((skill, index) => (
+                       <span key={index} className="px-4 py-1.5 bg-white/5 border border-white/5 rounded-full text-xs text-gray-300 font-medium hover:bg-white/10 cursor-pointer transition-colors">
+                          {skill}
+                       </span>
+                    ))
+                ) : (
+                    <span className="px-4 py-1.5 bg-white/5 border border-white/5 rounded-full text-xs text-gray-300 font-medium hover:bg-white/10 cursor-pointer transition-colors">
+                       {tag || 'Architecture'}
+                    </span>
+                )}
+                 <button 
+                  onClick={() => setIsEditingTags(true)}
+                  className="p-1.5 text-gray-600 hover:text-white bg-white/5 rounded-full opacity-0 group-hover:opacity-100 transition-all"
+                >
+                  <Edit2 size={12} />
+                </button>
+            </>
+          )}
       </div>
 
-      {/* Media Preview (Generative Placeholder) */}
-      <a href={link} target="_blank" rel="noopener noreferrer" className="block relative group overflow-hidden rounded-2xl mb-6 border border-white/5 bg-[#0A0D14]">
-         <div className="absolute inset-0 bg-gradient-to-t from-[#0A0D14] to-transparent z-10 opacity-60 group-hover:opacity-40 transition-opacity" />
-         
-         <div className="w-full h-64 sm:h-80 bg-gradient-to-br from-blue-900/20 via-[#151821] to-purple-900/20 flex flex-col items-center justify-center relative overflow-hidden">
-            <div className="absolute w-[500px] h-[500px] bg-blue-500/10 blur-[100px] rounded-full -top-1/2 -left-1/4 group-hover:bg-blue-500/20 transition-colors duration-700" />
-            <Github size={48} className="text-white/10 mb-4 z-20" />
-            <span className="font-mono text-white/20 text-3xl font-black tracking-widest uppercase z-20">{title.substring(0, 3)}</span>
-         </div>
-         
-         <div className="absolute bottom-4 right-4 z-20 bg-white/10 backdrop-blur-md px-4 py-2 rounded-xl border border-white/10 flex items-center gap-2 opacity-0 group-hover:opacity-100 transition-all translate-y-2 group-hover:translate-y-0">
-            <span className="text-xs font-bold text-white">View Source</span>
-            <ExternalLink size={14} className="text-white"/>
-         </div>
-      </a>
+      {/* EDITABLE MEDIA PREVIEW */}
+      <div className="relative group overflow-hidden rounded-2xl mb-6 border border-white/5 bg-[#0A0D14] min-h-[256px]">
+          {isEditingImage ? (
+              <div className="absolute inset-0 flex flex-col items-center justify-center gap-4 bg-[#151821] p-8 z-30">
+                 <input 
+                  type="text" 
+                  value={tempImageUrl}
+                  onChange={(e) => setTempImageUrl(e.target.value)}
+                  placeholder="Paste new image URL..."
+                  className="w-full bg-[#0A0D14] border border-white/10 rounded-xl px-4 py-3 text-sm text-white outline-none focus:border-blue-500"
+                  autoFocus
+                />
+                <div className="flex gap-2">
+                    <button onClick={saveImage} className="flex items-center gap-2 px-5 py-2.5 bg-green-600 hover:bg-green-500 text-white font-bold rounded-xl text-sm transition-colors"><Save size={14}/> Save Image</button>
+                    <button onClick={() => setIsEditingImage(false)} className="flex items-center gap-2 px-5 py-2.5 bg-white/5 hover:bg-white/10 text-white font-medium rounded-xl text-sm transition-colors"><X size={14}/> Cancel</button>
+                </div>
+              </div>
+          ) : (
+              <button 
+                onClick={() => setIsEditingImage(true)}
+                className="absolute top-4 right-4 p-3 bg-black/60 hover:bg-blue-600 rounded-full text-white/70 hover:text-white backdrop-blur-md transition-all z-20 opacity-0 group-hover:opacity-100"
+              >
+                <ImageIcon size={16} />
+              </button>
+          )}
+          
+          <a href={link} target="_blank" rel="noopener noreferrer" className="block relative h-full">
+             <div className="absolute inset-0 bg-gradient-to-t from-[#0A0D14] to-transparent z-10 opacity-60 group-hover:opacity-40 transition-opacity" />
+             
+             {image_url ? (
+                <img src={image_url} alt={title} className="w-full h-full object-cover rounded-2xl h-64 sm:h-80" />
+             ) : (
+                 <div className="w-full h-64 sm:h-80 bg-gradient-to-br from-blue-900/20 via-[#151821] to-purple-900/20 flex flex-col items-center justify-center relative overflow-hidden">
+                    <div className="absolute w-[500px] h-[500px] bg-blue-500/10 blur-[100px] rounded-full -top-1/2 -left-1/4 group-hover:bg-blue-500/20 transition-colors duration-700" />
+                    <Github size={48} className="text-white/10 mb-4 z-20" />
+                    <span className="font-mono text-white/20 text-3xl font-black tracking-widest uppercase z-20">{title.substring(0, 3)}</span>
+                 </div>
+             )}
+             
+             {/* Link Overlay */}
+             <div className="absolute bottom-4 right-4 z-20 bg-white/10 backdrop-blur-md px-4 py-2 rounded-xl border border-white/10 flex items-center gap-2 opacity-0 group-hover:opacity-100 transition-all translate-y-2 group-hover:translate-y-0">
+                <span className="text-xs font-bold text-white">View Source</span>
+                <ExternalLink size={14} className="text-white"/>
+             </div>
+          </a>
+      </div>
 
       {/* Engagement Bar */}
       <div className="flex items-center justify-between pt-4 border-t border-white/5">
