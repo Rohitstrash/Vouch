@@ -5,6 +5,7 @@
 import { createBrowserClient } from '@supabase/ssr'
 import { useEffect, useState } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
+import Link from 'next/link'
 import { 
   Search, Bell, MessageSquare, Flame, Clock, Filter, 
   CheckCircle2, MoreHorizontal, Sparkles, Trophy, 
@@ -459,12 +460,14 @@ function FeedCard({ id, user_id, title, tag, skills, desc, link, vouchCount, onV
       {/* Post Header */}
       <div className="flex justify-between items-start mb-6">
          <div className="flex items-center gap-4">
-            <img src={author_avatar || 'https://www.gravatar.com/avatar/?d=mp'} className="w-12 h-12 rounded-full border border-white/10 object-cover cursor-pointer hover:opacity-80 transition-opacity" alt="Author" />
+            <Link href={`/profile/${user_id}`}>
+              <img src={author_avatar || 'https://www.gravatar.com/avatar/?d=mp'} className="w-12 h-12 rounded-full border border-white/10 object-cover cursor-pointer hover:opacity-80 transition-opacity" alt="Author" />
+            </Link>
             <div>
-              <div className="flex items-center gap-1.5 cursor-pointer hover:underline decoration-white/30">
+              <Link href={`/profile/${user_id}`} className="flex items-center gap-1.5 cursor-pointer hover:underline decoration-white/30">
                 <h4 className="font-bold text-white tracking-tight">{author_name || 'Network Builder'}</h4>
                 <CheckCircle2 size={16} className="text-blue-500" strokeWidth={3} />
-              </div>
+              </Link>
               <p className="text-xs text-gray-500 font-medium mt-0.5">{author_designation || 'Builder'} • {timeAgo(createdAt)}</p>
             </div>
          </div>
