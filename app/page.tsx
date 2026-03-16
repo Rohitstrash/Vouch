@@ -3,9 +3,10 @@
 'use client'
 
 import { createBrowserClient } from '@supabase/ssr'
-import { useEffect, useState } from 'react'
-import { motion, AnimatePresence } from 'framer-motion'
+import { useEffect, useState, Suspense } from 'react'
+import { useParams } from 'next/navigation'
 import Link from 'next/link'
+import { motion, AnimatePresence } from 'framer-motion'
 import { 
   Search, Bell, MessageSquare, Flame, Clock, Filter, 
   CheckCircle2, MoreHorizontal, Sparkles, Trophy, 
@@ -14,13 +15,11 @@ import {
 } from 'lucide-react'
 import { signOut } from './actions'
 
-// --- HELPER FUNCTION: REALTIME TIME AGO ---
 function timeAgo(dateString) {
   if (!dateString) return "Unknown time";
   const date = new Date(dateString);
   const now = new Date();
   const seconds = Math.floor((now - date) / 1000);
-
   let interval = seconds / 31536000;
   if (interval > 1) return Math.floor(interval) + " years ago";
   interval = seconds / 2592000;
@@ -42,24 +41,20 @@ export default function VouchNetworkFeed() {
   const [vouchedIds, setVouchedIds] = useState([]) 
   const [globalVouchCounts, setGlobalVouchCounts] = useState({})
 
-  // Auth States
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [isLoginView, setIsLoginView] = useState(false)
   const [authMsg, setAuthMsg] = useState({ text: '', type: '' })
 
-  // Dynamic States
   const [searchQuery, setSearchQuery] = useState('')
   const [showNotifications, setShowNotifications] = useState(false)
   const [isEditingProfile, setIsEditingProfile] = useState(false)
   const [profileForm, setProfileForm] = useState({ full_name: '', bio: '', avatar_url: '' })
 
-  // Editable Designation States
   const [designation, setDesignation] = useState('')
   const [tempDesignation, setTempDesignation] = useState('')
   const [isEditingDesignation, setIsEditingDesignation] = useState(false)
 
-  // --- NEW: Custom Project States ---
   const [isAddingProject, setIsAddingProject] = useState(false)
   const [newProjectForm, setNewProjectForm] = useState({ title: '', desc: '', link: '', tag: '', image_url: '' })
 
@@ -118,10 +113,7 @@ export default function VouchNetworkFeed() {
   const fetchAndSaveGitHubRepos = async (authIdentifier, existingDbProjects, isToken, currentUser) => {
     setIsSyncing(true)
     try {
-      const url = isToken 
-        ? 'https://api.github.com/user/repos?sort=updated&per_page=10' 
-        : `https://api.github.com/users/${authIdentifier}/repos?sort=updated&per_page=10`
-      
+      const url = isToken ? 'https://api.github.com/user/repos?sort=updated&per_page=10' : `https://api.github.com/users/${authIdentifier}/repos?sort=updated&per_page=10`
       const headers = isToken ? { Authorization: `Bearer ${authIdentifier}` } : {}
       const res = await fetch(url, { headers })
       
@@ -150,7 +142,12 @@ export default function VouchNetworkFeed() {
         const uniqueGithubData = githubDataToInsert.filter(repo => !existingIds.has(repo.id))
 
         if (uniqueGithubData.length > 0) {
-           await supabase.from('projects').upsert(uniqueGithubData)
+           // ERROR CHECK ADDED HERE
+           const { error } = await supabase.from('projects').upsert(uniqueGithubData)
+           if (error) {
+               alert("Supabase Database Error (GitHub Sync): " + error.message)
+               return // Stop the fake local update if it didn't save
+           }
         }
 
         setProjects([...uniqueGithubData, ...existingDbProjects].sort((a,b) => new Date(b.created_at) - new Date(a.created_at)))
@@ -172,14 +169,11 @@ export default function VouchNetworkFeed() {
     } catch (e) {}
   }
 
-  // --- NEW: Handle Creating Custom Project ---
   const handleCreateProject = async (e) => {
     e.preventDefault()
     if (!user) return
 
-    // Create a unique ID string for custom projects
     const customId = `custom_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`
-
     const newProject = {
       id: customId,
       user_id: user.id,
@@ -208,10 +202,7 @@ export default function VouchNetworkFeed() {
   }
 
   const handleGithubLogin = () => {
-    supabase.auth.signInWithOAuth({ 
-      provider: 'github', 
-      options: { redirectTo: `${window.location.origin}/auth/callback`, scopes: 'repo read:user' } 
-    })
+    supabase.auth.signInWithOAuth({ provider: 'github', options: { redirectTo: `${window.location.origin}/auth/callback`, scopes: 'repo read:user' } })
   }
 
   const handleEmailAuth = async (e) => {
@@ -222,22 +213,32 @@ export default function VouchNetworkFeed() {
       if (error) setAuthMsg({ text: error.message, type: 'error' })
       else window.location.reload()
     } else {
-      const { error } = await supabase.auth.signUp({ 
-        email, password, options: { emailRedirectTo: `${window.location.origin}/auth/callback` }
-      })
+      const { error } = await supabase.auth.signUp({ email, password, options: { emailRedirectTo: `${window.location.origin}/auth/callback` }})
       if (error) setAuthMsg({ text: error.message, type: 'error' })
       else setAuthMsg({ text: 'Success! Check your email to confirm your account.', type: 'success' })
     }
   }
 
+  // --- FIX: SAVING PROFILE UPDATES EVERYTHING NOW ---
   const saveProfile = async () => {
     try {
+      // 1. Update Auth
       const { data, error } = await supabase.auth.updateUser({
         data: { full_name: profileForm.full_name, bio: profileForm.bio, avatar_url: profileForm.avatar_url }
       })
       if (error) throw error
+      
+      // 2. Update all existing projects to show the new picture!
+      await supabase.from('projects').update({
+          author_name: profileForm.full_name,
+          author_avatar: profileForm.avatar_url
+      }).eq('user_id', user.id)
+
       setUser(data.user) 
       setIsEditingProfile(false) 
+      
+      // Force a reload to sync the browser cookies instantly
+      window.location.reload()
     } catch (error) { alert("Error updating profile: " + error.message) }
   }
 
@@ -245,17 +246,29 @@ export default function VouchNetworkFeed() {
     try {
       const { error } = await supabase.auth.updateUser({ data: { designation: tempDesignation } })
       if (error) throw error
+
+      await supabase.from('projects').update({ author_designation: tempDesignation }).eq('user_id', user.id)
+
       setDesignation(tempDesignation)
       setIsEditingDesignation(false)
+      window.location.reload()
     } catch (error) { alert("Error updating designation: " + error.message) }
   }
 
+  // --- FIX: STRICT ERROR CATCHING FOR UPDATES ---
   const updateProjectInDb = async (projectId, updates) => {
     try {
-      const { error } = await supabase.from('projects').update(updates).eq('id', projectId)
+      // We added .select() so we can check if it actually saved the row
+      const { data, error } = await supabase.from('projects').update(updates).eq('id', projectId).select()
       if (error) throw error
+
+      if (!data || data.length === 0) {
+          alert("Update Blocked: You need to disable Row Level Security (RLS) on the 'projects' table in Supabase.")
+          return
+      }
+
       setProjects(prev => prev.map(p => p.id === projectId ? { ...p, ...updates } : p))
-    } catch (error) { alert("Error updating project: " + error.message) }
+    } catch (error) { alert("Supabase Error: " + error.message) }
   }
 
   if (loading) return <div className="h-screen bg-[#0A0D14] flex items-center justify-center text-blue-500 animate-pulse font-bold text-2xl">Initializing Network...</div>
@@ -301,7 +314,6 @@ export default function VouchNetworkFeed() {
   return (
     <main className="min-h-screen bg-[#0A0D14] text-white font-sans selection:bg-blue-500/30 relative">
       
-      {/* PROFILE EDIT MODAL */}
       <AnimatePresence>
         {isEditingProfile && (
           <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="fixed inset-0 z-[100] bg-black/80 backdrop-blur-sm flex items-center justify-center p-4">
@@ -319,7 +331,6 @@ export default function VouchNetworkFeed() {
         )}
       </AnimatePresence>
 
-      {/* --- NEW: ADD CUSTOM PROJECT MODAL --- */}
       <AnimatePresence>
         {isAddingProject && (
           <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="fixed inset-0 z-[100] bg-black/80 backdrop-blur-sm flex items-center justify-center p-4 overflow-y-auto">
@@ -356,7 +367,6 @@ export default function VouchNetworkFeed() {
         )}
       </AnimatePresence>
 
-      {/* TOP NAVIGATION */}
       <nav className="sticky top-0 z-50 bg-[#0A0D14]/90 backdrop-blur-xl border-b border-white/5 px-4 md:px-8 py-4 flex items-center justify-between">
         <div className="flex items-center gap-3">
           <div className="w-8 h-8 bg-blue-600 rounded-xl flex items-center justify-center shadow-lg shadow-blue-500/20">
@@ -365,16 +375,9 @@ export default function VouchNetworkFeed() {
           <span className="text-xl font-bold tracking-tight hidden md:block">Vouch</span>
         </div>
 
-        {/* DYNAMIC SEARCH BAR */}
         <div className="hidden md:flex items-center bg-[#151821] rounded-full px-5 py-2.5 w-[500px] border border-white/5 focus-within:border-blue-500/50 transition-colors">
            <Search size={18} className="text-gray-500 mr-3" />
-           <input 
-             type="text" 
-             value={searchQuery}
-             onChange={(e) => setSearchQuery(e.target.value)}
-             placeholder="Search projects, skills, or builders..." 
-             className="bg-transparent border-none outline-none text-sm w-full text-white placeholder-gray-500" 
-           />
+           <input type="text" value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} placeholder="Search projects, skills, or builders..." className="bg-transparent border-none outline-none text-sm w-full text-white placeholder-gray-500" />
         </div>
 
         <div className="flex items-center gap-6">
@@ -405,10 +408,8 @@ export default function VouchNetworkFeed() {
        </div>
       </nav>
 
-      {/* MAIN LAYOUT GRID */}
       <div className="max-w-[1400px] mx-auto px-4 md:px-8 pt-10 pb-20 grid grid-cols-1 lg:grid-cols-4 gap-8">
         
-        {/* LEFT SIDEBAR - YOUR STATS */}
         <aside className="hidden lg:flex flex-col gap-6">
            <div className="bg-[#151821] rounded-3xl p-8 flex flex-col items-center relative border border-white/5 overflow-hidden group">
              <div className="absolute top-0 left-0 w-full h-24 bg-gradient-to-b from-blue-600/20 to-transparent" />
@@ -417,7 +418,6 @@ export default function VouchNetworkFeed() {
              <div className="absolute top-24 right-1/2 translate-x-10 translate-y-2 bg-blue-500 rounded-full p-1 border-[3px] border-[#151821] z-20"><CheckCircle2 size={12} className="text-white" strokeWidth={4} /></div>
              <h2 className="text-xl font-bold tracking-tight text-white text-center mt-2 flex items-center gap-2">{user.user_metadata?.full_name || user.user_metadata?.user_name || user.email.split('@')[0]}</h2>
              
-             {/* EDITABLE DESIGNATION */}
              <div className="relative mt-1 group w-full flex justify-center">
                 {isEditingDesignation ? (
                   <div className="flex items-center gap-1.5 bg-[#0A0D14] border border-white/10 rounded-lg p-1">
@@ -434,15 +434,10 @@ export default function VouchNetworkFeed() {
              </div>
            </div>
 
-           {/* --- NEW: POST CUSTOM PROJECT BUTTON --- */}
-           <button 
-              onClick={() => setIsAddingProject(true)}
-              className="w-full bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-500 hover:to-purple-500 rounded-2xl p-4 flex items-center justify-center gap-2 transition-all shadow-lg shadow-blue-600/20 text-white font-bold"
-           >
+           <button onClick={() => setIsAddingProject(true)} className="w-full bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-500 hover:to-purple-500 rounded-2xl p-4 flex items-center justify-center gap-2 transition-all shadow-lg shadow-blue-600/20 text-white font-bold">
               <Plus size={18} strokeWidth={3} /> Post a Project
            </button>
 
-           {/* Top Vouched Skills Card */}
            <div className="bg-[#151821] rounded-3xl p-6 border border-white/5">
               <div className="flex items-center gap-3 mb-6">
                  <div className="p-2.5 bg-purple-500/10 rounded-xl"><Trophy size={18} className="text-purple-400" /></div>
@@ -467,23 +462,17 @@ export default function VouchNetworkFeed() {
            </div>
         </aside>
 
-        {/* MAIN GLOBAL FEED */}
         <div className="col-span-1 lg:col-span-3 space-y-8">
            
            <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-4">
               <div className="flex bg-[#151821] p-1.5 rounded-2xl border border-white/5 w-fit">
                 <button className="flex items-center gap-2 px-6 py-2.5 bg-[#232733] rounded-xl text-sm font-semibold text-white shadow-sm border border-white/5"><Flame size={16} className="text-orange-500"/> Global Feed</button>
               </div>
-              {/* Mobile "Post Project" Button */}
-              <button 
-                onClick={() => setIsAddingProject(true)}
-                className="lg:hidden flex items-center gap-2 px-5 py-2.5 bg-blue-600 rounded-2xl text-sm font-bold text-white transition-colors"
-              >
+              <button onClick={() => setIsAddingProject(true)} className="lg:hidden flex items-center gap-2 px-5 py-2.5 bg-blue-600 rounded-2xl text-sm font-bold text-white transition-colors">
                 <Plus size={16}/> Post Project
               </button>
            </div>
 
-           {/* Projects Feed */}
            <div className="space-y-6">
               {displayedProjects.length > 0 ? (
                 displayedProjects.map((proj) => (
@@ -510,9 +499,7 @@ export default function VouchNetworkFeed() {
   )
 }
 
-// FEED POST COMPONENT
 function FeedCard({ id, user_id, title, tag, skills, desc, link, vouchCount, onVouch, vouched, author_name, author_avatar, author_designation, created_at, image_url, onUpdateProject, currentUserId }) {
-  // Only allow editing if the current user owns this project
   const isOwner = user_id === currentUserId;
 
   const [isEditingTags, setIsEditingTags] = useState(false);
@@ -534,7 +521,6 @@ function FeedCard({ id, user_id, title, tag, skills, desc, link, vouchCount, onV
   return (
     <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} className="bg-[#151821] border border-white/5 rounded-[2rem] p-6 sm:p-8 hover:border-white/10 transition-colors shadow-xl shadow-black/50">
       
-      {/* Post Header */}
       <div className="flex justify-between items-start mb-6">
          <div className="flex items-center gap-4">
             <Link href={`/profile/${user_id}`}>
@@ -553,7 +539,6 @@ function FeedCard({ id, user_id, title, tag, skills, desc, link, vouchCount, onV
       <h2 className="text-2xl sm:text-3xl font-bold text-white mb-3 tracking-tight">{title}</h2>
       <p className="text-gray-400 text-sm sm:text-base leading-relaxed mb-6 max-w-3xl whitespace-pre-line">{desc}</p>
 
-      {/* EDITABLE SKILL TAGS (If Owner) */}
       <div className="flex items-center gap-2 mb-8 group relative flex-wrap">
           {isEditingTags ? (
               <div className="flex items-center gap-2 bg-[#0A0D14] border border-white/10 rounded-lg p-1.5 w-full max-w-lg">
@@ -574,7 +559,6 @@ function FeedCard({ id, user_id, title, tag, skills, desc, link, vouchCount, onV
           )}
       </div>
 
-      {/* EDITABLE MEDIA PREVIEW */}
       <div className="relative group overflow-hidden rounded-2xl mb-6 border border-white/5 bg-[#0A0D14] min-h-[256px]">
           {isEditingImage ? (
               <div className="absolute inset-0 flex flex-col items-center justify-center gap-4 bg-[#151821] p-8 z-30">
@@ -607,7 +591,6 @@ function FeedCard({ id, user_id, title, tag, skills, desc, link, vouchCount, onV
           </a>
       </div>
 
-      {/* Engagement Bar */}
       <div className="flex items-center justify-between pt-4 border-t border-white/5">
          <div className="flex items-center gap-6">
             <button onClick={onVouch} disabled={vouched} className={`flex items-center gap-2 text-sm font-medium transition-colors ${vouched ? 'text-blue-500 cursor-default' : 'text-gray-400 hover:text-white'}`}>
