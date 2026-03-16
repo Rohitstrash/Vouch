@@ -1,4 +1,4 @@
-// @ts-nocheck
+﻿// @ts-nocheck
 /* eslint-disable */
 'use client'
 
@@ -9,7 +9,7 @@ import Link from 'next/link'
 import { motion } from 'framer-motion'
 import { 
   CheckCircle2, Sparkles, Trophy, Github, Heart, MessageSquare, 
-  MoreHorizontal, ExternalLink, ArrowLeft, UserPlus, Send
+  ExternalLink, ArrowLeft, UserPlus, Send
 } from 'lucide-react'
 
 // Helper for time
@@ -98,7 +98,7 @@ export default function PublicProfile() {
     <div className="h-screen bg-[#0A0D14] flex flex-col items-center justify-center text-white space-y-4">
       <CheckCircle2 size={48} className="text-gray-600 mb-4" />
       <h1 className="text-2xl font-bold">Builder Not Found</h1>
-      <p className="text-gray-500">This user hasn't published any projects yet.</p>
+      <p className="text-gray-500">This user has not published any projects yet.</p>
       <Link href="/" className="px-6 py-3 mt-4 bg-blue-600 rounded-xl font-bold text-white hover:bg-blue-500 transition-colors">Return to Feed</Link>
     </div>
   )
@@ -133,7 +133,7 @@ export default function PublicProfile() {
            <div className="bg-[#151821] rounded-3xl p-8 flex flex-col items-center relative border border-white/5 overflow-hidden">
              <div className="absolute top-0 left-0 w-full h-24 bg-gradient-to-b from-blue-600/20 to-transparent" />
              <div className="w-24 h-24 rounded-full overflow-hidden border-4 border-[#151821] shadow-2xl relative z-10 mb-4">
-               <img src={profileData.avatar || 'https://www.gravatar.com/avatar/?d=mp'} className="w-full h-full object-cover" />
+               <img src={profileData.avatar || 'https://www.gravatar.com/avatar/?d=mp'} className="w-full h-full object-cover" alt="Profile" />
              </div>
              <div className="absolute top-24 right-1/2 translate-x-10 translate-y-2 bg-blue-500 rounded-full p-1 border-[3px] border-[#151821] z-20"><CheckCircle2 size={12} className="text-white" strokeWidth={4} /></div>
              <h2 className="text-xl font-bold tracking-tight text-white text-center mt-2">{profileData.name}</h2>
@@ -212,7 +212,7 @@ function PublicFeedCard({ title, tag, skills, desc, link, vouchCount, onVouch, v
                 <h4 className="font-bold text-white tracking-tight">{author_name || 'Builder'}</h4>
                 <CheckCircle2 size={16} className="text-blue-500" strokeWidth={3} />
               </div>
-              <p className="text-xs text-gray-500 font-medium mt-0.5">{author_designation || 'Builder'} � {timeAgo(created_at)}</p>
+              <p className="text-xs text-gray-500 font-medium mt-0.5">{author_designation || 'Builder'} • {timeAgo(created_at)}</p>
             </div>
          </div>
       </div>
