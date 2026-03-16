@@ -142,11 +142,10 @@ export default function VouchNetworkFeed() {
         const uniqueGithubData = githubDataToInsert.filter(repo => !existingIds.has(repo.id))
 
         if (uniqueGithubData.length > 0) {
-           // ERROR CHECK ADDED HERE
            const { error } = await supabase.from('projects').upsert(uniqueGithubData)
            if (error) {
                alert("Supabase Database Error (GitHub Sync): " + error.message)
-               return // Stop the fake local update if it didn't save
+               return 
            }
         }
 
@@ -219,16 +218,13 @@ export default function VouchNetworkFeed() {
     }
   }
 
-  // --- FIX: SAVING PROFILE UPDATES EVERYTHING NOW ---
   const saveProfile = async () => {
     try {
-      // 1. Update Auth
       const { data, error } = await supabase.auth.updateUser({
         data: { full_name: profileForm.full_name, bio: profileForm.bio, avatar_url: profileForm.avatar_url }
       })
       if (error) throw error
       
-      // 2. Update all existing projects to show the new picture!
       await supabase.from('projects').update({
           author_name: profileForm.full_name,
           author_avatar: profileForm.avatar_url
@@ -237,7 +233,6 @@ export default function VouchNetworkFeed() {
       setUser(data.user) 
       setIsEditingProfile(false) 
       
-      // Force a reload to sync the browser cookies instantly
       window.location.reload()
     } catch (error) { alert("Error updating profile: " + error.message) }
   }
@@ -255,10 +250,8 @@ export default function VouchNetworkFeed() {
     } catch (error) { alert("Error updating designation: " + error.message) }
   }
 
-  // --- FIX: STRICT ERROR CATCHING FOR UPDATES ---
   const updateProjectInDb = async (projectId, updates) => {
     try {
-      // We added .select() so we can check if it actually saved the row
       const { data, error } = await supabase.from('projects').update(updates).eq('id', projectId).select()
       if (error) throw error
 
@@ -269,6 +262,22 @@ export default function VouchNetworkFeed() {
 
       setProjects(prev => prev.map(p => p.id === projectId ? { ...p, ...updates } : p))
     } catch (error) { alert("Supabase Error: " + error.message) }
+  }
+
+  // --- NEW: HANDLE SECURE ACCOUNT DELETION ---
+  const handleDeleteAccount = async () => {
+    const confirmDelete = window.confirm("Are you absolutely sure? This will permanently delete your profile, all your projects, and all your vouches. This cannot be undone.");
+    if (!confirmDelete) return;
+
+    try {
+      const { error } = await supabase.rpc('delete_my_account');
+      if (error) throw error;
+
+      await supabase.auth.signOut();
+      window.location.reload();
+    } catch (error) {
+      alert("Error deleting account: " + error.message);
+    }
   }
 
   if (loading) return <div className="h-screen bg-[#0A0D14] flex items-center justify-center text-blue-500 animate-pulse font-bold text-2xl">Initializing Network...</div>
@@ -326,6 +335,18 @@ export default function VouchNetworkFeed() {
                 <div><label className="text-xs font-bold text-gray-400 uppercase tracking-wider mb-2 block">Avatar URL</label><input type="text" value={profileForm.avatar_url} onChange={(e) => setProfileForm({...profileForm, avatar_url: e.target.value})} className="w-full bg-[#0A0D14] border border-white/10 rounded-xl px-4 py-3 text-sm text-white outline-none focus:border-blue-500" /></div>
                 <button onClick={saveProfile} className="w-full py-3.5 bg-blue-600 hover:bg-blue-500 text-white font-bold rounded-xl mt-4 transition-colors">Save Changes</button>
               </div>
+
+              {/* --- NEW: DANGER ZONE --- */}
+              <div className="mt-8 pt-6 border-t border-red-500/20">
+                <h3 className="text-red-400 text-xs font-bold uppercase tracking-wider mb-3">Danger Zone</h3>
+                <button 
+                  onClick={handleDeleteAccount} 
+                  className="w-full py-3 bg-red-500/10 hover:bg-red-500/20 text-red-500 font-bold rounded-xl border border-red-500/20 transition-colors"
+                >
+                  Delete Account Permanently
+                </button>
+              </div>
+
             </motion.div>
           </motion.div>
         )}
