@@ -38,7 +38,7 @@ export default function VouchNetworkFeed() {
   const [user, setUser] = useState(null)
   const [loading, setLoading] = useState(true)
   const [isSyncing, setIsSyncing] = useState(false)
-  const [projects, setProjects] = useState([]) // NOW HOLDS GLOBAL PROJECTS
+  const [projects, setProjects] = useState([])
   const [vouchedIds, setVouchedIds] = useState([]) 
   const [globalVouchCounts, setGlobalVouchCounts] = useState({})
 
@@ -59,6 +59,10 @@ export default function VouchNetworkFeed() {
   const [tempDesignation, setTempDesignation] = useState('')
   const [isEditingDesignation, setIsEditingDesignation] = useState(false)
 
+  // --- NEW: Custom Project States ---
+  const [isAddingProject, setIsAddingProject] = useState(false)
+  const [newProjectForm, setNewProjectForm] = useState({ title: '', desc: '', link: '', tag: '', image_url: '' })
+
   const supabase = createBrowserClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL || '',
     process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || ''
@@ -69,7 +73,6 @@ export default function VouchNetworkFeed() {
       try {
         const { data: { session } } = await supabase.auth.getSession()
         
-        // 1. Get all vouches to calculate global scores
         const { data: allVouches } = await supabase.from('vouches').select('project_id')
         if (allVouches) {
           const counts = {}
@@ -87,18 +90,14 @@ export default function VouchNetworkFeed() {
           })
           setDesignation(currentUser.user_metadata?.designation || 'Software Engineer')
           
-          // Get IDs of projects *this* user has vouched for
           const { data: myVouches } = await supabase.from('vouches').select('project_id').eq('voucher_id', currentUser.id)
           if (myVouches) setVouchedIds(myVouches.map(v => v.project_id))
 
-          // --- MULTIPLAYER UPDATE: FETCH ALL PROJECTS FROM EVERYONE ---
-          // Notice we removed the `.eq('user_id')` filter!
           const { data: globalDbProjects } = await supabase.from('projects').select('*').order('created_at', { ascending: false })
           
           const token = currentUser.provider_token
           const githubUsername = currentUser.user_metadata?.preferred_username || currentUser.user_metadata?.user_name
           
-          // Trigger GitHub sync, passing in the global projects so we don't duplicate
           if (token) {
             await fetchAndSaveGitHubRepos(token, globalDbProjects || [], true, currentUser)
           } else if (githubUsername) {
@@ -116,7 +115,6 @@ export default function VouchNetworkFeed() {
     initializeProtocol()
   }, [])
 
-  // --- MULTIPLAYER UPDATE: SAVE REPOS TO DATABASE SO OTHERS CAN SEE ---
   const fetchAndSaveGitHubRepos = async (authIdentifier, existingDbProjects, isToken, currentUser) => {
     setIsSyncing(true)
     try {
@@ -134,9 +132,8 @@ export default function VouchNetworkFeed() {
 
       const data = await res.json()
       if (Array.isArray(data)) {
-        // Map GitHub data to match our Supabase columns perfectly
         const githubDataToInsert = data.map(repo => ({
-          id: repo.id.toString(), // If your DB uses UUIDs, you might need to let Supabase auto-generate ID and store repo.id in a github_id column. Assuming string ID for now based on previous code.
+          id: repo.id.toString(), 
           user_id: currentUser.id,
           title: repo.name,
           tag: repo.language || 'Protocol',
@@ -144,22 +141,18 @@ export default function VouchNetworkFeed() {
           desc: repo.description || 'Verified via GitHub Sync. Building scalable solutions.',
           link: repo.html_url,
           created_at: repo.pushed_at, 
-          // Adding the author details we created in Step 1
           author_name: currentUser.user_metadata?.full_name || currentUser.user_metadata?.user_name || currentUser.email.split('@')[0],
           author_avatar: currentUser.user_metadata?.avatar_url || 'https://www.gravatar.com/avatar/?d=mp',
           author_designation: currentUser.user_metadata?.designation || 'Software Engineer'
         }))
         
-        // Find which repos aren't in the database yet
         const existingIds = new Set(existingDbProjects.map(p => p.id))
         const uniqueGithubData = githubDataToInsert.filter(repo => !existingIds.has(repo.id))
 
-        // Save new ones to the actual database so everyone can see them!
         if (uniqueGithubData.length > 0) {
            await supabase.from('projects').upsert(uniqueGithubData)
         }
 
-        // Update local state with the combined list
         setProjects([...uniqueGithubData, ...existingDbProjects].sort((a,b) => new Date(b.created_at) - new Date(a.created_at)))
       }
     } catch (e) { 
@@ -177,6 +170,41 @@ export default function VouchNetworkFeed() {
     try {
       await supabase.from('vouches').insert({ project_id: projectId, voucher_id: user.id })
     } catch (e) {}
+  }
+
+  // --- NEW: Handle Creating Custom Project ---
+  const handleCreateProject = async (e) => {
+    e.preventDefault()
+    if (!user) return
+
+    // Create a unique ID string for custom projects
+    const customId = `custom_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`
+
+    const newProject = {
+      id: customId,
+      user_id: user.id,
+      title: newProjectForm.title,
+      desc: newProjectForm.desc,
+      link: newProjectForm.link,
+      tag: newProjectForm.tag || 'Design',
+      skills: newProjectForm.tag.split(',').map(s => s.trim()).filter(Boolean) || ['Design'],
+      created_at: new Date().toISOString(),
+      author_name: user.user_metadata?.full_name || user.user_metadata?.user_name || user.email.split('@')[0],
+      author_avatar: user.user_metadata?.avatar_url || 'https://www.gravatar.com/avatar/?d=mp',
+      author_designation: designation || 'Builder',
+      image_url: newProjectForm.image_url
+    }
+
+    try {
+      const { error } = await supabase.from('projects').insert([newProject])
+      if (error) throw error
+
+      setProjects(prev => [newProject, ...prev])
+      setIsAddingProject(false)
+      setNewProjectForm({ title: '', desc: '', link: '', tag: '', image_url: '' })
+    } catch (error) {
+      alert("Error adding project: " + error.message)
+    }
   }
 
   const handleGithubLogin = () => {
@@ -254,15 +282,12 @@ export default function VouchNetworkFeed() {
     )
   }
 
-  // --- GLOBAL SEARCH LOGIC ---
-  // Now searches through all projects on the network!
   const displayedProjects = projects.filter(p => 
     p.title.toLowerCase().includes(searchQuery.toLowerCase()) || 
     (p.tag && p.tag.toLowerCase().includes(searchQuery.toLowerCase())) ||
     (p.author_name && p.author_name.toLowerCase().includes(searchQuery.toLowerCase()))
   )
 
-  // Leaderboard logic: only count MY projects for the sidebar
   const myProjects = projects.filter(p => p.user_id === user.id);
   const topSkills = Object.entries(
     myProjects.reduce((acc, proj) => {
@@ -289,6 +314,43 @@ export default function VouchNetworkFeed() {
                 <div><label className="text-xs font-bold text-gray-400 uppercase tracking-wider mb-2 block">Avatar URL</label><input type="text" value={profileForm.avatar_url} onChange={(e) => setProfileForm({...profileForm, avatar_url: e.target.value})} className="w-full bg-[#0A0D14] border border-white/10 rounded-xl px-4 py-3 text-sm text-white outline-none focus:border-blue-500" /></div>
                 <button onClick={saveProfile} className="w-full py-3.5 bg-blue-600 hover:bg-blue-500 text-white font-bold rounded-xl mt-4 transition-colors">Save Changes</button>
               </div>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* --- NEW: ADD CUSTOM PROJECT MODAL --- */}
+      <AnimatePresence>
+        {isAddingProject && (
+          <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="fixed inset-0 z-[100] bg-black/80 backdrop-blur-sm flex items-center justify-center p-4 overflow-y-auto">
+            <motion.div initial={{ scale: 0.95, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} exit={{ scale: 0.95, opacity: 0 }} className="bg-[#151821] border border-white/10 rounded-3xl p-6 sm:p-8 w-full max-w-lg relative my-8">
+              <button onClick={() => setIsAddingProject(false)} className="absolute top-4 right-4 p-2 text-gray-400 hover:text-white bg-white/5 rounded-full"><X size={18} /></button>
+              <h2 className="text-xl font-bold text-white mb-6 flex items-center gap-2"><Sparkles className="text-blue-500" size={20}/> Post a Project</h2>
+              <form onSubmit={handleCreateProject} className="space-y-4">
+                <div>
+                  <label className="text-xs font-bold text-gray-400 uppercase tracking-wider mb-2 block">Project Title <span className="text-red-500">*</span></label>
+                  <input type="text" required value={newProjectForm.title} onChange={(e) => setNewProjectForm({...newProjectForm, title: e.target.value})} placeholder="e.g. Modern Landing Page Design" className="w-full bg-[#0A0D14] border border-white/10 rounded-xl px-4 py-3 text-sm text-white outline-none focus:border-blue-500" />
+                </div>
+                <div>
+                  <label className="text-xs font-bold text-gray-400 uppercase tracking-wider mb-2 block">Description <span className="text-red-500">*</span></label>
+                  <textarea required value={newProjectForm.desc} onChange={(e) => setNewProjectForm({...newProjectForm, desc: e.target.value})} placeholder="What did you build? What problem does it solve?" rows={3} className="w-full bg-[#0A0D14] border border-white/10 rounded-xl px-4 py-3 text-sm text-white outline-none focus:border-blue-500 resize-none" />
+                </div>
+                <div>
+                  <label className="text-xs font-bold text-gray-400 uppercase tracking-wider mb-2 block">External Link</label>
+                  <input type="url" value={newProjectForm.link} onChange={(e) => setNewProjectForm({...newProjectForm, link: e.target.value})} placeholder="https://dribbble.com/... or https://yoursite.com" className="w-full bg-[#0A0D14] border border-white/10 rounded-xl px-4 py-3 text-sm text-white outline-none focus:border-blue-500" />
+                </div>
+                <div>
+                  <label className="text-xs font-bold text-gray-400 uppercase tracking-wider mb-2 block">Skills / Tags (Comma separated)</label>
+                  <input type="text" value={newProjectForm.tag} onChange={(e) => setNewProjectForm({...newProjectForm, tag: e.target.value})} placeholder="Figma, UI/UX, React..." className="w-full bg-[#0A0D14] border border-white/10 rounded-xl px-4 py-3 text-sm text-white outline-none focus:border-blue-500" />
+                </div>
+                <div>
+                  <label className="text-xs font-bold text-gray-400 uppercase tracking-wider mb-2 block">Cover Image URL</label>
+                  <input type="url" value={newProjectForm.image_url} onChange={(e) => setNewProjectForm({...newProjectForm, image_url: e.target.value})} placeholder="https://imgur.com/...png" className="w-full bg-[#0A0D14] border border-white/10 rounded-xl px-4 py-3 text-sm text-white outline-none focus:border-blue-500" />
+                </div>
+                <button type="submit" className="w-full py-3.5 bg-blue-600 hover:bg-blue-500 text-white font-bold rounded-xl mt-6 transition-colors shadow-lg shadow-blue-600/20">
+                  Publish to Network
+                </button>
+              </form>
             </motion.div>
           </motion.div>
         )}
@@ -372,6 +434,14 @@ export default function VouchNetworkFeed() {
              </div>
            </div>
 
+           {/* --- NEW: POST CUSTOM PROJECT BUTTON --- */}
+           <button 
+              onClick={() => setIsAddingProject(true)}
+              className="w-full bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-500 hover:to-purple-500 rounded-2xl p-4 flex items-center justify-center gap-2 transition-all shadow-lg shadow-blue-600/20 text-white font-bold"
+           >
+              <Plus size={18} strokeWidth={3} /> Post a Project
+           </button>
+
            {/* Top Vouched Skills Card */}
            <div className="bg-[#151821] rounded-3xl p-6 border border-white/5">
               <div className="flex items-center gap-3 mb-6">
@@ -404,6 +474,13 @@ export default function VouchNetworkFeed() {
               <div className="flex bg-[#151821] p-1.5 rounded-2xl border border-white/5 w-fit">
                 <button className="flex items-center gap-2 px-6 py-2.5 bg-[#232733] rounded-xl text-sm font-semibold text-white shadow-sm border border-white/5"><Flame size={16} className="text-orange-500"/> Global Feed</button>
               </div>
+              {/* Mobile "Post Project" Button */}
+              <button 
+                onClick={() => setIsAddingProject(true)}
+                className="lg:hidden flex items-center gap-2 px-5 py-2.5 bg-blue-600 rounded-2xl text-sm font-bold text-white transition-colors"
+              >
+                <Plus size={16}/> Post Project
+              </button>
            </div>
 
            {/* Projects Feed */}
@@ -434,7 +511,7 @@ export default function VouchNetworkFeed() {
 }
 
 // FEED POST COMPONENT
-function FeedCard({ id, user_id, title, tag, skills, desc, link, vouchCount, onVouch, vouched, author_name, author_avatar, author_designation, createdAt, image_url, onUpdateProject, currentUserId }) {
+function FeedCard({ id, user_id, title, tag, skills, desc, link, vouchCount, onVouch, vouched, author_name, author_avatar, author_designation, created_at, image_url, onUpdateProject, currentUserId }) {
   // Only allow editing if the current user owns this project
   const isOwner = user_id === currentUserId;
 
@@ -468,13 +545,13 @@ function FeedCard({ id, user_id, title, tag, skills, desc, link, vouchCount, onV
                 <h4 className="font-bold text-white tracking-tight">{author_name || 'Network Builder'}</h4>
                 <CheckCircle2 size={16} className="text-blue-500" strokeWidth={3} />
               </Link>
-              <p className="text-xs text-gray-500 font-medium mt-0.5">{author_designation || 'Builder'} • {timeAgo(createdAt)}</p>
+              <p className="text-xs text-gray-500 font-medium mt-0.5">{author_designation || 'Builder'} • {timeAgo(created_at)}</p>
             </div>
          </div>
       </div>
 
       <h2 className="text-2xl sm:text-3xl font-bold text-white mb-3 tracking-tight">{title}</h2>
-      <p className="text-gray-400 text-sm sm:text-base leading-relaxed mb-6 max-w-3xl">{desc}</p>
+      <p className="text-gray-400 text-sm sm:text-base leading-relaxed mb-6 max-w-3xl whitespace-pre-line">{desc}</p>
 
       {/* EDITABLE SKILL TAGS (If Owner) */}
       <div className="flex items-center gap-2 mb-8 group relative flex-wrap">
@@ -513,18 +590,20 @@ function FeedCard({ id, user_id, title, tag, skills, desc, link, vouchCount, onV
               )
           )}
           
-          <a href={link} target="_blank" rel="noopener noreferrer" className="block relative h-full">
+          <a href={link || '#'} target={link ? "_blank" : "_self"} rel="noopener noreferrer" className={`block relative h-full ${!link && 'cursor-default'}`}>
              <div className="absolute inset-0 bg-gradient-to-t from-[#0A0D14] to-transparent z-10 opacity-60 group-hover:opacity-40 transition-opacity" />
              {image_url ? (
                 <img src={image_url} alt={title} className="w-full h-full object-cover rounded-2xl h-64 sm:h-80" />
              ) : (
                  <div className="w-full h-64 sm:h-80 bg-gradient-to-br from-blue-900/20 via-[#151821] to-purple-900/20 flex flex-col items-center justify-center relative overflow-hidden">
                     <div className="absolute w-[500px] h-[500px] bg-blue-500/10 blur-[100px] rounded-full -top-1/2 -left-1/4 group-hover:bg-blue-500/20 transition-colors duration-700" />
-                    <Github size={48} className="text-white/10 mb-4 z-20" />
+                    <Sparkles size={48} className="text-white/10 mb-4 z-20" />
                     <span className="font-mono text-white/20 text-3xl font-black tracking-widest uppercase z-20">{title.substring(0, 3)}</span>
                  </div>
              )}
-             <div className="absolute bottom-4 right-4 z-20 bg-white/10 backdrop-blur-md px-4 py-2 rounded-xl border border-white/10 flex items-center gap-2 opacity-0 group-hover:opacity-100 transition-all translate-y-2 group-hover:translate-y-0"><span className="text-xs font-bold text-white">View Source</span><ExternalLink size={14} className="text-white"/></div>
+             {link && (
+               <div className="absolute bottom-4 right-4 z-20 bg-white/10 backdrop-blur-md px-4 py-2 rounded-xl border border-white/10 flex items-center gap-2 opacity-0 group-hover:opacity-100 transition-all translate-y-2 group-hover:translate-y-0"><span className="text-xs font-bold text-white">View Source</span><ExternalLink size={14} className="text-white"/></div>
+             )}
           </a>
       </div>
 
