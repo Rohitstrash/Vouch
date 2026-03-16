@@ -1,4 +1,3 @@
-// FORCE CLEAN BUILD
 // @ts-nocheck
 /* eslint-disable */
 'use client'
@@ -34,7 +33,7 @@ function timeAgo(dateString) {
 
 export default function PublicProfile() {
   const params = useParams()
-  const profileId = params.id // Grabs the user ID from the URL
+  const profileId = params.id 
 
   const [loggedInUser, setLoggedInUser] = useState(null)
   const [loading, setLoading] = useState(true)
@@ -54,12 +53,10 @@ export default function PublicProfile() {
         const { data: { session } } = await supabase.auth.getSession()
         if (session) {
           setLoggedInUser(session.user)
-          // Get what the logged-in user has vouched for
           const { data: myVouches } = await supabase.from('vouches').select('project_id').eq('voucher_id', session.user.id)
           if (myVouches) setVouchedIds(myVouches.map(v => v.project_id))
         }
 
-        // Get global vouch counts
         const { data: allVouches } = await supabase.from('vouches').select('project_id')
         if (allVouches) {
           const counts = {}
@@ -67,12 +64,10 @@ export default function PublicProfile() {
           setGlobalVouchCounts(counts)
         }
 
-        // Fetch specifically THIS user's projects
         const { data: projects } = await supabase.from('projects').select('*').eq('user_id', profileId).order('created_at', { ascending: false })
         
         if (projects && projects.length > 0) {
           setUserProjects(projects)
-          // Extract their profile info from their most recent project
           setProfileData({
             name: projects[0].author_name,
             avatar: projects[0].author_avatar,
@@ -108,7 +103,6 @@ export default function PublicProfile() {
     </div>
   )
 
-  // Calculate THIS user's specific leaderboard
   const topSkills = Object.entries(
     userProjects.reduce((acc, proj) => {
       const skill = proj.tag || 'Protocol';
@@ -121,7 +115,6 @@ export default function PublicProfile() {
   return (
     <main className="min-h-screen bg-[#0A0D14] text-white font-sans selection:bg-blue-500/30">
       
-      {/* TOP NAV (Simplified for Profile view) */}
       <nav className="sticky top-0 z-50 bg-[#0A0D14]/90 backdrop-blur-xl border-b border-white/5 px-4 md:px-8 py-4 flex items-center gap-4">
         <Link href="/" className="p-2 bg-white/5 hover:bg-white/10 rounded-xl text-gray-400 hover:text-white transition-colors">
           <ArrowLeft size={20} />
@@ -136,7 +129,6 @@ export default function PublicProfile() {
 
       <div className="max-w-[1400px] mx-auto px-4 md:px-8 pt-10 pb-20 grid grid-cols-1 lg:grid-cols-4 gap-8">
         
-        {/* LEFT SIDEBAR - PUBLIC PROFILE */}
         <aside className="flex flex-col gap-6">
            <div className="bg-[#151821] rounded-3xl p-8 flex flex-col items-center relative border border-white/5 overflow-hidden">
              <div className="absolute top-0 left-0 w-full h-24 bg-gradient-to-b from-blue-600/20 to-transparent" />
@@ -147,7 +139,6 @@ export default function PublicProfile() {
              <h2 className="text-xl font-bold tracking-tight text-white text-center mt-2">{profileData.name}</h2>
              <p className="text-sm text-gray-500 text-center mt-1">{profileData.designation}</p>
 
-             {/* CONNECT ACTIONS */}
              {loggedInUser?.id !== profileId && (
                <div className="flex gap-2 w-full mt-6">
                  <button className="flex-1 py-2.5 bg-blue-600 hover:bg-blue-500 text-white text-sm font-bold rounded-xl flex items-center justify-center gap-2 transition-colors">
@@ -160,7 +151,6 @@ export default function PublicProfile() {
              )}
            </div>
 
-           {/* Top Vouched Skills Card */}
            <div className="bg-[#151821] rounded-3xl p-6 border border-white/5">
               <div className="flex items-center gap-3 mb-6">
                  <div className="p-2.5 bg-purple-500/10 rounded-xl"><Trophy size={18} className="text-purple-400" /></div>
@@ -185,7 +175,6 @@ export default function PublicProfile() {
            </div>
         </aside>
 
-        {/* MAIN FEED - USER'S PROJECTS */}
         <div className="col-span-1 lg:col-span-3 space-y-8">
            <div className="flex items-center gap-2 mb-2">
              <Sparkles size={20} className="text-blue-500"/>
@@ -210,7 +199,6 @@ export default function PublicProfile() {
   )
 }
 
-// SIMPLIFIED PUBLIC FEED CARD (No Edit Logic)
 function PublicFeedCard({ title, tag, skills, desc, link, vouchCount, onVouch, vouched, author_name, author_avatar, author_designation, created_at, image_url }) {
   const displaySkills = skills || [tag || 'Architecture'];
 
