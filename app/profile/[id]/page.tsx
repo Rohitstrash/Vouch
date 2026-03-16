@@ -3,7 +3,7 @@
 'use client'
 
 import { createBrowserClient } from '@supabase/ssr'
-import { useEffect, useState } from 'react'
+import { useEffect, useState, Suspense } from 'react'
 import { useParams } from 'next/navigation'
 import Link from 'next/link'
 import { motion } from 'framer-motion'
@@ -31,7 +31,8 @@ function timeAgo(dateString) {
   return Math.floor(seconds) + " seconds ago";
 }
 
-export default function PublicProfile() {
+// 1. We renamed your main function to ProfileContent
+function ProfileContent() {
   const params = useParams()
   const profileId = params.id 
 
@@ -246,5 +247,14 @@ function PublicFeedCard({ title, tag, skills, desc, link, vouchCount, onVouch, v
          </div>
       </div>
     </motion.div>
+  )
+}
+
+// 2. We export a new default component that wraps the content in Suspense
+export default function PublicProfile() {
+  return (
+    <Suspense fallback={<div className="h-screen bg-[#0A0D14] flex items-center justify-center text-blue-500 animate-pulse font-bold text-2xl">Loading Profile...</div>}>
+      <ProfileContent />
+    </Suspense>
   )
 }
