@@ -264,7 +264,6 @@ export default function VouchNetworkFeed() {
     } catch (error) { alert("Supabase Error: " + error.message) }
   }
 
-  // --- NEW: HANDLE SECURE ACCOUNT DELETION ---
   const handleDeleteAccount = async () => {
     const confirmDelete = window.confirm("Are you absolutely sure? This will permanently delete your profile, all your projects, and all your vouches. This cannot be undone.");
     if (!confirmDelete) return;
@@ -336,7 +335,6 @@ export default function VouchNetworkFeed() {
                 <button onClick={saveProfile} className="w-full py-3.5 bg-blue-600 hover:bg-blue-500 text-white font-bold rounded-xl mt-4 transition-colors">Save Changes</button>
               </div>
 
-              {/* --- NEW: DANGER ZONE --- */}
               <div className="mt-8 pt-6 border-t border-red-500/20">
                 <h3 className="text-red-400 text-xs font-bold uppercase tracking-wider mb-3">Danger Zone</h3>
                 <button 
@@ -346,7 +344,6 @@ export default function VouchNetworkFeed() {
                   Delete Account Permanently
                 </button>
               </div>
-
             </motion.div>
           </motion.div>
         )}
@@ -500,6 +497,7 @@ export default function VouchNetworkFeed() {
                   <FeedCard 
                     key={proj.id} 
                     {...proj} 
+                    currentUser={user} // Passed down to generate comments
                     currentUserId={user.id}
                     vouchCount={globalVouchCounts[proj.id] || 0}
                     vouched={vouchedIds.includes(proj.id)}
@@ -520,13 +518,24 @@ export default function VouchNetworkFeed() {
   )
 }
 
-function FeedCard({ id, user_id, title, tag, skills, desc, link, vouchCount, onVouch, vouched, author_name, author_avatar, author_designation, created_at, image_url, onUpdateProject, currentUserId }) {
+function FeedCard({ id, user_id, title, tag, skills, desc, link, vouchCount, onVouch, vouched, author_name, author_avatar, author_designation, created_at, image_url, onUpdateProject, currentUserId, currentUser }) {
   const isOwner = user_id === currentUserId;
 
   const [isEditingTags, setIsEditingTags] = useState(false);
   const [tempTags, setTempTags] = useState(skills?.join(', ') || tag);
   const [isEditingImage, setIsEditingImage] = useState(false);
   const [tempImageUrl, setTempImageUrl] = useState(image_url || '');
+
+  // NEW: Comment System States
+  const [showComments, setShowComments] = useState(false);
+  const [comments, setComments] = useState([]);
+  const [newComment, setNewComment] = useState('');
+  const [isSubmittingComment, setIsSubmittingComment] = useState(false);
+
+  const supabase = createBrowserClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL || '',
+    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || ''
+  )
 
   const saveTags = async () => {
     const newSkills = tempTags.split(',').map(s => s.trim()).filter(Boolean);
@@ -537,6 +546,41 @@ function FeedCard({ id, user_id, title, tag, skills, desc, link, vouchCount, onV
   const saveImage = async () => {
     await onUpdateProject(id, { image_url: tempImageUrl });
     setIsEditingImage(false);
+  }
+
+  // NEW: Toggle and Fetch Comments
+  const toggleComments = async () => {
+    if (!showComments) {
+      const { data } = await supabase.from('comments').select('*').eq('project_id', id).order('created_at', { ascending: true });
+      if (data) setComments(data);
+    }
+    setShowComments(!showComments);
+  }
+
+  // NEW: Submit Comment
+  const submitComment = async (e) => {
+    e.preventDefault();
+    if (!newComment.trim() || isSubmittingComment) return;
+    setIsSubmittingComment(true);
+
+    const commentObj = {
+      project_id: id,
+      user_id: currentUserId,
+      content: newComment.trim(),
+      author_name: currentUser.user_metadata?.full_name || currentUser.user_metadata?.user_name || currentUser.email.split('@')[0] || 'Builder',
+      author_avatar: currentUser.user_metadata?.avatar_url || 'https://www.gravatar.com/avatar/?d=mp'
+    };
+
+    try {
+      const { data, error } = await supabase.from('comments').insert([commentObj]).select();
+      if (error) throw error;
+      if (data) setComments(prev => [...prev, data[0]]);
+      setNewComment('');
+    } catch (err) {
+      alert("Error posting comment: " + err.message);
+    } finally {
+      setIsSubmittingComment(false);
+    }
   }
 
   return (
@@ -612,20 +656,73 @@ function FeedCard({ id, user_id, title, tag, skills, desc, link, vouchCount, onV
           </a>
       </div>
 
+      {/* Engagement Bar */}
       <div className="flex items-center justify-between pt-4 border-t border-white/5">
          <div className="flex items-center gap-6">
             <button onClick={onVouch} disabled={vouched} className={`flex items-center gap-2 text-sm font-medium transition-colors ${vouched ? 'text-blue-500 cursor-default' : 'text-gray-400 hover:text-white'}`}>
                <Heart size={18} className={vouched ? 'fill-blue-500' : ''} />
                <span>{vouchCount}</span>
             </button>
-            <button className="flex items-center gap-2 text-sm font-medium text-gray-400 hover:text-white transition-colors">
-               <MessageSquare size={18} /><span>Discuss</span>
+            
+            {/* NEW: Modified Discuss Button */}
+            <button onClick={toggleComments} className={`flex items-center gap-2 text-sm font-medium transition-colors ${showComments ? 'text-white' : 'text-gray-400 hover:text-white'}`}>
+               <MessageSquare size={18} /><span>{comments.length > 0 ? `${comments.length} Comments` : 'Discuss'}</span>
             </button>
          </div>
          {vouched && (
            <div className="flex items-center gap-1.5 px-3 py-1 bg-blue-500/10 rounded-lg border border-blue-500/20"><CheckCircle2 size={14} className="text-blue-400" /><span className="text-[10px] font-bold text-blue-400 uppercase tracking-wide">Vouched</span></div>
          )}
       </div>
+
+      {/* NEW: Collapsible Comments Section */}
+      <AnimatePresence>
+        {showComments && (
+          <motion.div initial={{ height: 0, opacity: 0 }} animate={{ height: 'auto', opacity: 1 }} exit={{ height: 0, opacity: 0 }} className="overflow-hidden">
+            <div className="pt-6 border-t border-white/5 mt-6 space-y-4">
+              
+              {/* Comment Thread */}
+              {comments.length > 0 ? (
+                <div className="space-y-4 mb-4 max-h-60 overflow-y-auto pr-2 custom-scrollbar">
+                  {comments.map(c => (
+                    <div key={c.id} className="flex gap-3">
+                      <img src={c.author_avatar || 'https://www.gravatar.com/avatar/?d=mp'} className="w-8 h-8 rounded-full bg-white/10 border border-white/5 object-cover" alt="Avatar"/>
+                      <div className="flex-1 bg-white/5 p-3 rounded-2xl rounded-tl-none border border-white/5">
+                        <div className="flex justify-between items-center mb-1">
+                          <span className="text-xs font-bold text-white">{c.author_name}</span>
+                          <span className="text-[10px] text-gray-500">{timeAgo(c.created_at)}</span>
+                        </div>
+                        <p className="text-sm text-gray-300">{c.content}</p>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <p className="text-xs text-gray-500 text-center mb-4 italic">No comments yet. Start the discussion!</p>
+              )}
+
+              {/* Comment Input */}
+              <form onSubmit={submitComment} className="flex gap-2">
+                <input 
+                  type="text" 
+                  value={newComment} 
+                  onChange={e => setNewComment(e.target.value)} 
+                  placeholder="Leave a comment..." 
+                  className="flex-1 bg-[#0A0D14] border border-white/10 rounded-xl px-4 py-3 text-sm text-white outline-none focus:border-blue-500 transition-colors"
+                />
+                <button 
+                  type="submit" 
+                  disabled={isSubmittingComment || !newComment.trim()} 
+                  className="px-6 py-3 bg-blue-600 hover:bg-blue-500 disabled:opacity-50 text-white text-sm font-bold rounded-xl transition-colors"
+                >
+                  Post
+                </button>
+              </form>
+
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
     </motion.div>
   )
 }
