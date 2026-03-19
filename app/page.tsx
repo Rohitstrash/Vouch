@@ -41,6 +41,10 @@ export default function VouchNetworkFeed() {
   const [vouchedIds, setVouchedIds] = useState([]) 
   const [globalVouchCounts, setGlobalVouchCounts] = useState({})
 
+  // NEW: Notification States
+  const [notifications, setNotifications] = useState([])
+  const [unreadCount, setUnreadCount] = useState(0)
+
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [isLoginView, setIsLoginView] = useState(false)
@@ -88,6 +92,13 @@ export default function VouchNetworkFeed() {
           const { data: myVouches } = await supabase.from('vouches').select('project_id').eq('voucher_id', currentUser.id)
           if (myVouches) setVouchedIds(myVouches.map(v => v.project_id))
 
+          // --- NEW: Fetch Notifications ---
+          const { data: notifs } = await supabase.from('notifications').select('*').eq('user_id', currentUser.id).order('created_at', { ascending: false }).limit(20)
+          if (notifs) {
+              setNotifications(notifs)
+              setUnreadCount(notifs.filter(n => !n.is_read).length)
+          }
+
           const { data: globalDbProjects } = await supabase.from('projects').select('*').order('created_at', { ascending: false })
           
           const token = currentUser.provider_token
@@ -109,6 +120,16 @@ export default function VouchNetworkFeed() {
     }
     initializeProtocol()
   }, [])
+
+  // --- NEW: Mark Notifications as Read ---
+  const handleToggleNotifications = async () => {
+    setShowNotifications(!showNotifications);
+    if (!showNotifications && unreadCount > 0) {
+       setUnreadCount(0);
+       setNotifications(prev => prev.map(n => ({...n, is_read: true})));
+       await supabase.from('notifications').update({ is_read: true }).eq('user_id', user.id).eq('is_read', false);
+    }
+  }
 
   const fetchAndSaveGitHubRepos = async (authIdentifier, existingDbProjects, isToken, currentUser) => {
     setIsSyncing(true)
@@ -163,8 +184,24 @@ export default function VouchNetworkFeed() {
     if (!user?.id || vouchedIds.includes(projectId)) return
     setVouchedIds(prev => [...prev, projectId])
     setGlobalVouchCounts(prev => ({ ...prev, [projectId]: (prev[projectId] || 0) + 1 }))
+    
+    const project = projects.find(p => p.id === projectId);
+
     try {
       await supabase.from('vouches').insert({ project_id: projectId, voucher_id: user.id })
+
+      // --- NEW: Create Notification if someone else owns this project ---
+      if (project && project.user_id !== user.id) {
+          await supabase.from('notifications').insert({
+             user_id: project.user_id,
+             actor_name: user.user_metadata?.full_name || user.user_metadata?.user_name || user.email.split('@')[0] || 'A Builder',
+             actor_avatar: user.user_metadata?.avatar_url || 'https://www.gravatar.com/avatar/?d=mp',
+             project_id: projectId,
+             project_title: project.title,
+             type: 'vouch'
+          });
+      }
+
     } catch (e) {}
   }
 
@@ -172,7 +209,6 @@ export default function VouchNetworkFeed() {
     e.preventDefault()
     if (!user) return
 
-    // FIX: Properly format skills array and fallback primary tag
     const rawSkills = newProjectForm.tag ? newProjectForm.tag.split(',').map(s => s.trim()).filter(Boolean) : [];
     const customId = `custom_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`
     
@@ -326,15 +362,11 @@ export default function VouchNetworkFeed() {
   )
 
   const myProjects = projects.filter(p => p.user_id === user.id);
-  
-  // FIX: Iterate through ALL skills for the leaderboard!
   const topSkills = Object.entries(
     myProjects.reduce((acc, proj) => {
       const skillsList = (proj.skills && proj.skills.length > 0) ? proj.skills : [proj.tag || 'Protocol'];
       const score = globalVouchCounts[proj.id] || 0; 
-      skillsList.forEach(skill => {
-          acc[skill] = (acc[skill] || 0) + score;
-      });
+      skillsList.forEach(skill => { acc[skill] = (acc[skill] || 0) + score; });
       return acc;
     }, {})
   ).map(([name, count]) => ({ name, count })).sort((a, b) => b.count - a.count).slice(0, 5);
@@ -419,16 +451,37 @@ export default function VouchNetworkFeed() {
         </div>
 
         <div className="flex items-center gap-6">
+          
+          {/* --- NEW: Interactive Notification Bell --- */}
           <div className="relative">
-            <Bell size={20} onClick={() => setShowNotifications(!showNotifications)} className={`cursor-pointer transition-colors ${showNotifications ? 'text-white' : 'text-gray-400 hover:text-white'}`} />
+            <div className="relative cursor-pointer" onClick={handleToggleNotifications}>
+              <Bell size={20} className={`transition-colors ${showNotifications ? 'text-white' : 'text-gray-400 hover:text-white'}`} />
+              {unreadCount > 0 && (
+                <div className="absolute -top-1 -right-1 w-2.5 h-2.5 bg-red-500 rounded-full border-2 border-[#0A0D14]"></div>
+              )}
+            </div>
+            
             {showNotifications && (
-              <div className="absolute top-8 right-0 w-80 bg-[#151821] border border-white/10 rounded-2xl shadow-2xl p-4 z-50">
+              <div className="absolute top-10 right-0 w-80 bg-[#151821] border border-white/10 rounded-2xl shadow-2xl p-4 z-50">
                 <h3 className="text-sm font-bold text-white mb-3">Notifications</h3>
-                <div className="space-y-3">
-                  <div className="flex gap-3 items-start bg-white/5 p-3 rounded-xl">
-                    <div className="p-2 bg-blue-500/20 rounded-lg text-blue-400"><Heart size={14}/></div>
-                    <div><p className="text-xs text-gray-300"><span className="text-white font-bold">Alex</span> vouched for your project <span className="text-blue-400">Vouch Network</span></p><p className="text-[10px] text-gray-500 mt-1">2 hours ago</p></div>
-                  </div>
+                <div className="space-y-3 max-h-[300px] overflow-y-auto custom-scrollbar">
+                  {notifications.length > 0 ? (
+                    notifications.map(n => (
+                      <div key={n.id} className={`flex gap-3 items-start p-3 rounded-xl ${n.is_read ? 'bg-white/5 opacity-70' : 'bg-blue-500/10 border border-blue-500/20'}`}>
+                        <div className={`p-2 rounded-lg ${n.type === 'vouch' ? 'bg-blue-500/20 text-blue-400' : 'bg-purple-500/20 text-purple-400'}`}>
+                           {n.type === 'vouch' ? <Heart size={14}/> : <MessageSquare size={14}/>}
+                        </div>
+                        <div>
+                           <p className="text-xs text-gray-300">
+                             <span className="text-white font-bold">{n.actor_name}</span> {n.type === 'vouch' ? 'vouched for' : 'commented on'} your project <span className="text-white font-medium">{n.project_title}</span>
+                           </p>
+                           <p className="text-[10px] text-gray-500 mt-1">{timeAgo(n.created_at)}</p>
+                        </div>
+                      </div>
+                    ))
+                  ) : (
+                    <p className="text-xs text-gray-500 text-center italic py-4">No notifications yet.</p>
+                  )}
                 </div>
               </div>
             )}
@@ -606,13 +659,28 @@ function FeedCard({ id, user_id, title, tag, skills, desc, link, vouchCount, onV
     try {
       const { data, error } = await supabase.from('comments').insert([commentObj]).select();
       if (error) throw error;
+      
       if (!data || data.length === 0) {
           alert("Save Blocked! Please go to Supabase -> Table Editor -> 'comments' -> and turn OFF Row Level Security (RLS).");
           setIsSubmittingComment(false);
           return; 
       }
+      
       if (data) setComments(prev => [...prev, data[0]]);
       setNewComment('');
+
+      // --- NEW: Send Notification to Project Owner ---
+      if (!isOwner) {
+          supabase.from('notifications').insert({
+             user_id: user_id, 
+             actor_name: currentUser.user_metadata?.full_name || currentUser.user_metadata?.user_name || currentUser.email.split('@')[0] || 'A Builder',
+             actor_avatar: currentUser.user_metadata?.avatar_url || 'https://www.gravatar.com/avatar/?d=mp',
+             project_id: id,
+             project_title: title,
+             type: 'comment'
+          }).then(); // Fire and forget
+      }
+
     } catch (err) {
       alert("Error posting comment: " + err.message);
     } finally {
