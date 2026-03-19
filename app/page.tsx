@@ -172,15 +172,18 @@ export default function VouchNetworkFeed() {
     e.preventDefault()
     if (!user) return
 
+    // FIX: Properly format skills array and fallback primary tag
+    const rawSkills = newProjectForm.tag ? newProjectForm.tag.split(',').map(s => s.trim()).filter(Boolean) : [];
     const customId = `custom_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`
+    
     const newProject = {
       id: customId,
       user_id: user.id,
       title: newProjectForm.title,
       desc: newProjectForm.desc,
       link: newProjectForm.link,
-      tag: newProjectForm.tag || 'Design',
-      skills: newProjectForm.tag.split(',').map(s => s.trim()).filter(Boolean) || ['Design'],
+      tag: rawSkills[0] || 'Design',
+      skills: rawSkills.length > 0 ? rawSkills : ['Design'],
       created_at: new Date().toISOString(),
       author_name: user.user_metadata?.full_name || user.user_metadata?.user_name || user.email.split('@')[0],
       author_avatar: user.user_metadata?.avatar_url || 'https://www.gravatar.com/avatar/?d=mp',
@@ -264,7 +267,6 @@ export default function VouchNetworkFeed() {
     } catch (error) { alert("Supabase Error: " + error.message) }
   }
 
-  // --- NEW: Handle Delete Project ---
   const deleteProjectInDb = async (projectId) => {
     const confirmDelete = window.confirm("Are you sure you want to delete this project? This cannot be undone.");
     if (!confirmDelete) return;
@@ -324,11 +326,15 @@ export default function VouchNetworkFeed() {
   )
 
   const myProjects = projects.filter(p => p.user_id === user.id);
+  
+  // FIX: Iterate through ALL skills for the leaderboard!
   const topSkills = Object.entries(
     myProjects.reduce((acc, proj) => {
-      const skill = proj.tag || 'Protocol';
+      const skillsList = (proj.skills && proj.skills.length > 0) ? proj.skills : [proj.tag || 'Protocol'];
       const score = globalVouchCounts[proj.id] || 0; 
-      acc[skill] = (acc[skill] || 0) + score;
+      skillsList.forEach(skill => {
+          acc[skill] = (acc[skill] || 0) + score;
+      });
       return acc;
     }, {})
   ).map(([name, count]) => ({ name, count })).sort((a, b) => b.count - a.count).slice(0, 5);
@@ -536,13 +542,11 @@ export default function VouchNetworkFeed() {
 function FeedCard({ id, user_id, title, tag, skills, desc, link, vouchCount, onVouch, vouched, author_name, author_avatar, author_designation, created_at, image_url, onUpdateProject, onDeleteProject, currentUserId, currentUser }) {
   const isOwner = user_id === currentUserId;
 
-  // Edit states for Image/Tags
   const [isEditingTags, setIsEditingTags] = useState(false);
   const [tempTags, setTempTags] = useState(skills?.join(', ') || tag);
   const [isEditingImage, setIsEditingImage] = useState(false);
   const [tempImageUrl, setTempImageUrl] = useState(image_url || '');
 
-  // NEW: Full Project Edit & Delete
   const [showProjectMenu, setShowProjectMenu] = useState(false);
   const [isEditingProject, setIsEditingProject] = useState(false);
   const [editTitle, setEditTitle] = useState(title);
@@ -565,13 +569,11 @@ function FeedCard({ id, user_id, title, tag, skills, desc, link, vouchCount, onV
     setIsEditingImage(false);
   }
 
-  // Comment System States
   const [showComments, setShowComments] = useState(false);
   const [comments, setComments] = useState([]);
   const [newComment, setNewComment] = useState('');
   const [isSubmittingComment, setIsSubmittingComment] = useState(false);
   
-  // NEW: Comment Edit & Delete states
   const [editingCommentId, setEditingCommentId] = useState(null);
   const [editCommentText, setEditCommentText] = useState('');
 
@@ -618,7 +620,6 @@ function FeedCard({ id, user_id, title, tag, skills, desc, link, vouchCount, onV
     }
   }
 
-  // NEW: Handle Delete Comment
   const deleteComment = async (commentId) => {
     if (!window.confirm("Are you sure you want to delete this comment?")) return;
     try {
@@ -630,7 +631,6 @@ function FeedCard({ id, user_id, title, tag, skills, desc, link, vouchCount, onV
     }
   }
 
-  // NEW: Handle Edit Comment
   const saveEditedComment = async (commentId) => {
     if (!editCommentText.trim()) return;
     try {
@@ -646,7 +646,6 @@ function FeedCard({ id, user_id, title, tag, skills, desc, link, vouchCount, onV
   return (
     <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} className="bg-[#151821] border border-white/5 rounded-[2rem] p-6 sm:p-8 hover:border-white/10 transition-colors shadow-xl shadow-black/50">
       
-      {/* HEADER WITH NEW (...) MENU */}
       <div className="flex justify-between items-start mb-6">
          <div className="flex items-center gap-4">
             <Link href={`/profile/${user_id}`}>
@@ -661,7 +660,6 @@ function FeedCard({ id, user_id, title, tag, skills, desc, link, vouchCount, onV
             </div>
          </div>
 
-         {/* --- NEW: PROJECT EDIT / DELETE MENU --- */}
          {isOwner && (
            <div className="relative">
              <button onClick={() => setShowProjectMenu(!showProjectMenu)} className="p-2 text-gray-400 hover:text-white rounded-full hover:bg-white/5 transition-colors">
@@ -677,7 +675,6 @@ function FeedCard({ id, user_id, title, tag, skills, desc, link, vouchCount, onV
          )}
       </div>
 
-      {/* INLINE EDIT MODE FOR PROJECT INFO */}
       {isEditingProject ? (
         <div className="space-y-4 mb-6 bg-[#0A0D14] p-4 rounded-2xl border border-white/10">
            <input type="text" value={editTitle} onChange={e => setEditTitle(e.target.value)} placeholder="Project Title" className="w-full bg-transparent border-b border-white/10 px-2 py-2 text-xl font-bold text-white outline-none focus:border-blue-500" />
@@ -695,7 +692,6 @@ function FeedCard({ id, user_id, title, tag, skills, desc, link, vouchCount, onV
         </>
       )}
 
-      {/* Tags */}
       <div className="flex items-center gap-2 mb-8 group relative flex-wrap">
           {isEditingTags ? (
               <div className="flex items-center gap-2 bg-[#0A0D14] border border-white/10 rounded-lg p-1.5 w-full max-w-lg">
@@ -716,7 +712,6 @@ function FeedCard({ id, user_id, title, tag, skills, desc, link, vouchCount, onV
           )}
       </div>
 
-      {/* Image Preview */}
       <div className="relative group overflow-hidden rounded-2xl mb-6 border border-white/5 bg-[#0A0D14] min-h-[256px]">
           {isEditingImage ? (
               <div className="absolute inset-0 flex flex-col items-center justify-center gap-4 bg-[#151821] p-8 z-30">
@@ -781,7 +776,6 @@ function FeedCard({ id, user_id, title, tag, skills, desc, link, vouchCount, onV
                           <span className="text-[10px] text-gray-500">{timeAgo(c.created_at)}</span>
                         </div>
 
-                        {/* --- NEW: INLINE COMMENT EDITING --- */}
                         {editingCommentId === c.id ? (
                           <div className="mt-2 flex gap-2">
                              <input type="text" value={editCommentText} onChange={(e) => setEditCommentText(e.target.value)} autoFocus className="flex-1 bg-[#0A0D14] border border-white/10 rounded-lg px-2 py-1 text-sm text-white outline-none focus:border-blue-500"/>
@@ -792,7 +786,6 @@ function FeedCard({ id, user_id, title, tag, skills, desc, link, vouchCount, onV
                           <>
                             <p className="text-sm text-gray-300">{c.content}</p>
                             
-                            {/* Comment Owner Controls (Edit & Delete) */}
                             {c.user_id === currentUserId && (
                               <div className="flex gap-3 mt-2">
                                 <button onClick={() => { setEditingCommentId(c.id); setEditCommentText(c.content); }} className="text-[10px] font-bold text-gray-500 hover:text-blue-400 transition-colors uppercase tracking-wider">Edit</button>
