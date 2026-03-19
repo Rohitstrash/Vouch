@@ -11,7 +11,7 @@ import {
   Search, Bell, MessageSquare, Flame, Clock, Filter, 
   CheckCircle2, MoreHorizontal, Sparkles, Trophy, 
   Github, LogOut, Heart, Plus, Zap, RefreshCw, ExternalLink, ArrowRight, Mail,
-  Edit2, X, Save, ImageIcon
+  Edit2, X, Save, ImageIcon, Trash2
 } from 'lucide-react'
 import { signOut } from './actions'
 
@@ -264,6 +264,20 @@ export default function VouchNetworkFeed() {
     } catch (error) { alert("Supabase Error: " + error.message) }
   }
 
+  // --- NEW: Handle Delete Project ---
+  const deleteProjectInDb = async (projectId) => {
+    const confirmDelete = window.confirm("Are you sure you want to delete this project? This cannot be undone.");
+    if (!confirmDelete) return;
+
+    try {
+      const { error } = await supabase.from('projects').delete().eq('id', projectId);
+      if (error) throw error;
+      setProjects(prev => prev.filter(p => p.id !== projectId));
+    } catch (error) {
+      alert("Error deleting project: " + error.message);
+    }
+  }
+
   const handleDeleteAccount = async () => {
     const confirmDelete = window.confirm("Are you absolutely sure? This will permanently delete your profile, all your projects, and all your vouches. This cannot be undone.");
     if (!confirmDelete) return;
@@ -503,6 +517,7 @@ export default function VouchNetworkFeed() {
                     vouched={vouchedIds.includes(proj.id)}
                     onVouch={() => handleVouch(proj.id)}
                     onUpdateProject={updateProjectInDb}
+                    onDeleteProject={deleteProjectInDb}
                   />
                 ))
               ) : (
@@ -518,23 +533,26 @@ export default function VouchNetworkFeed() {
   )
 }
 
-function FeedCard({ id, user_id, title, tag, skills, desc, link, vouchCount, onVouch, vouched, author_name, author_avatar, author_designation, created_at, image_url, onUpdateProject, currentUserId, currentUser }) {
+function FeedCard({ id, user_id, title, tag, skills, desc, link, vouchCount, onVouch, vouched, author_name, author_avatar, author_designation, created_at, image_url, onUpdateProject, onDeleteProject, currentUserId, currentUser }) {
   const isOwner = user_id === currentUserId;
 
+  // Edit states for Image/Tags
   const [isEditingTags, setIsEditingTags] = useState(false);
   const [tempTags, setTempTags] = useState(skills?.join(', ') || tag);
   const [isEditingImage, setIsEditingImage] = useState(false);
   const [tempImageUrl, setTempImageUrl] = useState(image_url || '');
 
-  const [showComments, setShowComments] = useState(false);
-  const [comments, setComments] = useState([]);
-  const [newComment, setNewComment] = useState('');
-  const [isSubmittingComment, setIsSubmittingComment] = useState(false);
+  // NEW: Full Project Edit & Delete
+  const [showProjectMenu, setShowProjectMenu] = useState(false);
+  const [isEditingProject, setIsEditingProject] = useState(false);
+  const [editTitle, setEditTitle] = useState(title);
+  const [editDesc, setEditDesc] = useState(desc);
+  const [editLink, setEditLink] = useState(link || '');
 
-  const supabase = createBrowserClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL || '',
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || ''
-  )
+  const saveProjectDetails = async () => {
+    await onUpdateProject(id, { title: editTitle, desc: editDesc, link: editLink });
+    setIsEditingProject(false);
+  }
 
   const saveTags = async () => {
     const newSkills = tempTags.split(',').map(s => s.trim()).filter(Boolean);
@@ -547,6 +565,21 @@ function FeedCard({ id, user_id, title, tag, skills, desc, link, vouchCount, onV
     setIsEditingImage(false);
   }
 
+  // Comment System States
+  const [showComments, setShowComments] = useState(false);
+  const [comments, setComments] = useState([]);
+  const [newComment, setNewComment] = useState('');
+  const [isSubmittingComment, setIsSubmittingComment] = useState(false);
+  
+  // NEW: Comment Edit & Delete states
+  const [editingCommentId, setEditingCommentId] = useState(null);
+  const [editCommentText, setEditCommentText] = useState('');
+
+  const supabase = createBrowserClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL || '',
+    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || ''
+  )
+
   const toggleComments = async () => {
     if (!showComments) {
       const { data } = await supabase.from('comments').select('*').eq('project_id', id).order('created_at', { ascending: true });
@@ -555,7 +588,6 @@ function FeedCard({ id, user_id, title, tag, skills, desc, link, vouchCount, onV
     setShowComments(!showComments);
   }
 
-  // --- NEW: Submit Comment with Ghost Trap ---
   const submitComment = async (e) => {
     e.preventDefault();
     if (!newComment.trim() || isSubmittingComment) return;
@@ -572,14 +604,11 @@ function FeedCard({ id, user_id, title, tag, skills, desc, link, vouchCount, onV
     try {
       const { data, error } = await supabase.from('comments').insert([commentObj]).select();
       if (error) throw error;
-
-      // The Ghost Trap: Alerts you if Supabase silently blocks the save!
       if (!data || data.length === 0) {
           alert("Save Blocked! Please go to Supabase -> Table Editor -> 'comments' -> and turn OFF Row Level Security (RLS).");
           setIsSubmittingComment(false);
           return; 
       }
-
       if (data) setComments(prev => [...prev, data[0]]);
       setNewComment('');
     } catch (err) {
@@ -589,9 +618,35 @@ function FeedCard({ id, user_id, title, tag, skills, desc, link, vouchCount, onV
     }
   }
 
+  // NEW: Handle Delete Comment
+  const deleteComment = async (commentId) => {
+    if (!window.confirm("Are you sure you want to delete this comment?")) return;
+    try {
+      const { error } = await supabase.from('comments').delete().eq('id', commentId);
+      if (error) throw error;
+      setComments(prev => prev.filter(c => c.id !== commentId));
+    } catch (err) {
+      alert("Error deleting comment: " + err.message);
+    }
+  }
+
+  // NEW: Handle Edit Comment
+  const saveEditedComment = async (commentId) => {
+    if (!editCommentText.trim()) return;
+    try {
+      const { error } = await supabase.from('comments').update({ content: editCommentText }).eq('id', commentId);
+      if (error) throw error;
+      setComments(prev => prev.map(c => c.id === commentId ? { ...c, content: editCommentText } : c));
+      setEditingCommentId(null);
+    } catch (err) {
+      alert("Error saving comment: " + err.message);
+    }
+  }
+
   return (
     <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} className="bg-[#151821] border border-white/5 rounded-[2rem] p-6 sm:p-8 hover:border-white/10 transition-colors shadow-xl shadow-black/50">
       
+      {/* HEADER WITH NEW (...) MENU */}
       <div className="flex justify-between items-start mb-6">
          <div className="flex items-center gap-4">
             <Link href={`/profile/${user_id}`}>
@@ -605,11 +660,42 @@ function FeedCard({ id, user_id, title, tag, skills, desc, link, vouchCount, onV
               <p className="text-xs text-gray-500 font-medium mt-0.5">{author_designation || 'Builder'} • {timeAgo(created_at)}</p>
             </div>
          </div>
+
+         {/* --- NEW: PROJECT EDIT / DELETE MENU --- */}
+         {isOwner && (
+           <div className="relative">
+             <button onClick={() => setShowProjectMenu(!showProjectMenu)} className="p-2 text-gray-400 hover:text-white rounded-full hover:bg-white/5 transition-colors">
+               <MoreHorizontal size={20} />
+             </button>
+             {showProjectMenu && (
+               <div className="absolute right-0 top-10 w-40 bg-[#1A1D27] border border-white/10 rounded-xl shadow-2xl py-1 z-50 overflow-hidden">
+                 <button onClick={() => { setIsEditingProject(true); setShowProjectMenu(false); }} className="w-full text-left px-4 py-2.5 text-sm font-medium text-gray-300 hover:text-white hover:bg-white/5 flex items-center gap-2"><Edit2 size={14}/> Edit Info</button>
+                 <button onClick={() => { onDeleteProject(id); setShowProjectMenu(false); }} className="w-full text-left px-4 py-2.5 text-sm font-medium text-red-400 hover:text-red-300 hover:bg-red-500/10 flex items-center gap-2 border-t border-white/5"><Trash2 size={14}/> Delete</button>
+               </div>
+             )}
+           </div>
+         )}
       </div>
 
-      <h2 className="text-2xl sm:text-3xl font-bold text-white mb-3 tracking-tight">{title}</h2>
-      <p className="text-gray-400 text-sm sm:text-base leading-relaxed mb-6 max-w-3xl whitespace-pre-line">{desc}</p>
+      {/* INLINE EDIT MODE FOR PROJECT INFO */}
+      {isEditingProject ? (
+        <div className="space-y-4 mb-6 bg-[#0A0D14] p-4 rounded-2xl border border-white/10">
+           <input type="text" value={editTitle} onChange={e => setEditTitle(e.target.value)} placeholder="Project Title" className="w-full bg-transparent border-b border-white/10 px-2 py-2 text-xl font-bold text-white outline-none focus:border-blue-500" />
+           <textarea value={editDesc} onChange={e => setEditDesc(e.target.value)} placeholder="Project Description" rows={3} className="w-full bg-transparent border-b border-white/10 px-2 py-2 text-sm text-gray-300 outline-none focus:border-blue-500 resize-none" />
+           <input type="url" value={editLink} onChange={e => setEditLink(e.target.value)} placeholder="External Link (Optional)" className="w-full bg-transparent border-b border-white/10 px-2 py-2 text-sm text-blue-400 outline-none focus:border-blue-500" />
+           <div className="flex gap-2 justify-end mt-2">
+              <button onClick={() => setIsEditingProject(false)} className="px-4 py-1.5 rounded-lg text-xs font-bold text-gray-400 hover:text-white hover:bg-white/5">Cancel</button>
+              <button onClick={saveProjectDetails} className="px-4 py-1.5 rounded-lg text-xs font-bold bg-blue-600 text-white hover:bg-blue-500 flex items-center gap-1"><Save size={12}/> Save Info</button>
+           </div>
+        </div>
+      ) : (
+        <>
+          <h2 className="text-2xl sm:text-3xl font-bold text-white mb-3 tracking-tight">{title}</h2>
+          <p className="text-gray-400 text-sm sm:text-base leading-relaxed mb-6 max-w-3xl whitespace-pre-line">{desc}</p>
+        </>
+      )}
 
+      {/* Tags */}
       <div className="flex items-center gap-2 mb-8 group relative flex-wrap">
           {isEditingTags ? (
               <div className="flex items-center gap-2 bg-[#0A0D14] border border-white/10 rounded-lg p-1.5 w-full max-w-lg">
@@ -630,6 +716,7 @@ function FeedCard({ id, user_id, title, tag, skills, desc, link, vouchCount, onV
           )}
       </div>
 
+      {/* Image Preview */}
       <div className="relative group overflow-hidden rounded-2xl mb-6 border border-white/5 bg-[#0A0D14] min-h-[256px]">
           {isEditingImage ? (
               <div className="absolute inset-0 flex flex-col items-center justify-center gap-4 bg-[#151821] p-8 z-30">
@@ -668,7 +755,6 @@ function FeedCard({ id, user_id, title, tag, skills, desc, link, vouchCount, onV
                <Heart size={18} className={vouched ? 'fill-blue-500' : ''} />
                <span>{vouchCount}</span>
             </button>
-            
             <button onClick={toggleComments} className={`flex items-center gap-2 text-sm font-medium transition-colors ${showComments ? 'text-white' : 'text-gray-400 hover:text-white'}`}>
                <MessageSquare size={18} /><span>{comments.length > 0 ? `${comments.length} Comments` : 'Discuss'}</span>
             </button>
@@ -688,12 +774,33 @@ function FeedCard({ id, user_id, title, tag, skills, desc, link, vouchCount, onV
                   {comments.map(c => (
                     <div key={c.id} className="flex gap-3">
                       <img src={c.author_avatar || 'https://www.gravatar.com/avatar/?d=mp'} className="w-8 h-8 rounded-full bg-white/10 border border-white/5 object-cover" alt="Avatar"/>
+                      
                       <div className="flex-1 bg-white/5 p-3 rounded-2xl rounded-tl-none border border-white/5">
                         <div className="flex justify-between items-center mb-1">
                           <span className="text-xs font-bold text-white">{c.author_name}</span>
                           <span className="text-[10px] text-gray-500">{timeAgo(c.created_at)}</span>
                         </div>
-                        <p className="text-sm text-gray-300">{c.content}</p>
+
+                        {/* --- NEW: INLINE COMMENT EDITING --- */}
+                        {editingCommentId === c.id ? (
+                          <div className="mt-2 flex gap-2">
+                             <input type="text" value={editCommentText} onChange={(e) => setEditCommentText(e.target.value)} autoFocus className="flex-1 bg-[#0A0D14] border border-white/10 rounded-lg px-2 py-1 text-sm text-white outline-none focus:border-blue-500"/>
+                             <button onClick={() => saveEditedComment(c.id)} className="text-[10px] bg-blue-600 text-white px-2 py-1 rounded font-bold hover:bg-blue-500">Save</button>
+                             <button onClick={() => setEditingCommentId(null)} className="text-[10px] bg-white/10 text-white px-2 py-1 rounded hover:bg-white/20">Cancel</button>
+                          </div>
+                        ) : (
+                          <>
+                            <p className="text-sm text-gray-300">{c.content}</p>
+                            
+                            {/* Comment Owner Controls (Edit & Delete) */}
+                            {c.user_id === currentUserId && (
+                              <div className="flex gap-3 mt-2">
+                                <button onClick={() => { setEditingCommentId(c.id); setEditCommentText(c.content); }} className="text-[10px] font-bold text-gray-500 hover:text-blue-400 transition-colors uppercase tracking-wider">Edit</button>
+                                <button onClick={() => deleteComment(c.id)} className="text-[10px] font-bold text-gray-500 hover:text-red-400 transition-colors uppercase tracking-wider">Delete</button>
+                              </div>
+                            )}
+                          </>
+                        )}
                       </div>
                     </div>
                   ))}
