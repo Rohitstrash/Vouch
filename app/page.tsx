@@ -497,7 +497,7 @@ export default function VouchNetworkFeed() {
                   <FeedCard 
                     key={proj.id} 
                     {...proj} 
-                    currentUser={user} // Passed down to generate comments
+                    currentUser={user}
                     currentUserId={user.id}
                     vouchCount={globalVouchCounts[proj.id] || 0}
                     vouched={vouchedIds.includes(proj.id)}
@@ -526,7 +526,6 @@ function FeedCard({ id, user_id, title, tag, skills, desc, link, vouchCount, onV
   const [isEditingImage, setIsEditingImage] = useState(false);
   const [tempImageUrl, setTempImageUrl] = useState(image_url || '');
 
-  // NEW: Comment System States
   const [showComments, setShowComments] = useState(false);
   const [comments, setComments] = useState([]);
   const [newComment, setNewComment] = useState('');
@@ -548,7 +547,6 @@ function FeedCard({ id, user_id, title, tag, skills, desc, link, vouchCount, onV
     setIsEditingImage(false);
   }
 
-  // NEW: Toggle and Fetch Comments
   const toggleComments = async () => {
     if (!showComments) {
       const { data } = await supabase.from('comments').select('*').eq('project_id', id).order('created_at', { ascending: true });
@@ -557,7 +555,7 @@ function FeedCard({ id, user_id, title, tag, skills, desc, link, vouchCount, onV
     setShowComments(!showComments);
   }
 
-  // NEW: Submit Comment
+  // --- NEW: Submit Comment with Ghost Trap ---
   const submitComment = async (e) => {
     e.preventDefault();
     if (!newComment.trim() || isSubmittingComment) return;
@@ -574,6 +572,14 @@ function FeedCard({ id, user_id, title, tag, skills, desc, link, vouchCount, onV
     try {
       const { data, error } = await supabase.from('comments').insert([commentObj]).select();
       if (error) throw error;
+
+      // The Ghost Trap: Alerts you if Supabase silently blocks the save!
+      if (!data || data.length === 0) {
+          alert("Save Blocked! Please go to Supabase -> Table Editor -> 'comments' -> and turn OFF Row Level Security (RLS).");
+          setIsSubmittingComment(false);
+          return; 
+      }
+
       if (data) setComments(prev => [...prev, data[0]]);
       setNewComment('');
     } catch (err) {
@@ -656,7 +662,6 @@ function FeedCard({ id, user_id, title, tag, skills, desc, link, vouchCount, onV
           </a>
       </div>
 
-      {/* Engagement Bar */}
       <div className="flex items-center justify-between pt-4 border-t border-white/5">
          <div className="flex items-center gap-6">
             <button onClick={onVouch} disabled={vouched} className={`flex items-center gap-2 text-sm font-medium transition-colors ${vouched ? 'text-blue-500 cursor-default' : 'text-gray-400 hover:text-white'}`}>
@@ -664,7 +669,6 @@ function FeedCard({ id, user_id, title, tag, skills, desc, link, vouchCount, onV
                <span>{vouchCount}</span>
             </button>
             
-            {/* NEW: Modified Discuss Button */}
             <button onClick={toggleComments} className={`flex items-center gap-2 text-sm font-medium transition-colors ${showComments ? 'text-white' : 'text-gray-400 hover:text-white'}`}>
                <MessageSquare size={18} /><span>{comments.length > 0 ? `${comments.length} Comments` : 'Discuss'}</span>
             </button>
@@ -674,13 +678,11 @@ function FeedCard({ id, user_id, title, tag, skills, desc, link, vouchCount, onV
          )}
       </div>
 
-      {/* NEW: Collapsible Comments Section */}
       <AnimatePresence>
         {showComments && (
           <motion.div initial={{ height: 0, opacity: 0 }} animate={{ height: 'auto', opacity: 1 }} exit={{ height: 0, opacity: 0 }} className="overflow-hidden">
             <div className="pt-6 border-t border-white/5 mt-6 space-y-4">
               
-              {/* Comment Thread */}
               {comments.length > 0 ? (
                 <div className="space-y-4 mb-4 max-h-60 overflow-y-auto pr-2 custom-scrollbar">
                   {comments.map(c => (
@@ -700,7 +702,6 @@ function FeedCard({ id, user_id, title, tag, skills, desc, link, vouchCount, onV
                 <p className="text-xs text-gray-500 text-center mb-4 italic">No comments yet. Start the discussion!</p>
               )}
 
-              {/* Comment Input */}
               <form onSubmit={submitComment} className="flex gap-2">
                 <input 
                   type="text" 
