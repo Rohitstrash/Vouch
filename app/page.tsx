@@ -41,7 +41,6 @@ export default function VouchNetworkFeed() {
   const [vouchedIds, setVouchedIds] = useState([]) 
   const [globalVouchCounts, setGlobalVouchCounts] = useState({})
 
-  // NEW: Notification States
   const [notifications, setNotifications] = useState([])
   const [unreadCount, setUnreadCount] = useState(0)
 
@@ -92,7 +91,6 @@ export default function VouchNetworkFeed() {
           const { data: myVouches } = await supabase.from('vouches').select('project_id').eq('voucher_id', currentUser.id)
           if (myVouches) setVouchedIds(myVouches.map(v => v.project_id))
 
-          // --- NEW: Fetch Notifications ---
           const { data: notifs } = await supabase.from('notifications').select('*').eq('user_id', currentUser.id).order('created_at', { ascending: false }).limit(20)
           if (notifs) {
               setNotifications(notifs)
@@ -121,7 +119,6 @@ export default function VouchNetworkFeed() {
     initializeProtocol()
   }, [])
 
-  // --- NEW: Mark Notifications as Read ---
   const handleToggleNotifications = async () => {
     setShowNotifications(!showNotifications);
     if (!showNotifications && unreadCount > 0) {
@@ -180,29 +177,48 @@ export default function VouchNetworkFeed() {
     }
   }
 
-  const handleVouch = async (projectId) => {
-    if (!user?.id || vouchedIds.includes(projectId)) return
-    setVouchedIds(prev => [...prev, projectId])
-    setGlobalVouchCounts(prev => ({ ...prev, [projectId]: (prev[projectId] || 0) + 1 }))
+  // --- FIX: TRUE TOGGLE VOUCH LOGIC ---
+  const handleToggleVouch = async (projectId) => {
+    if (!user?.id) return;
     
     const project = projects.find(p => p.id === projectId);
+    const isCurrentlyVouched = vouchedIds.includes(projectId);
 
-    try {
-      await supabase.from('vouches').insert({ project_id: projectId, voucher_id: user.id })
-
-      // --- NEW: Create Notification if someone else owns this project ---
-      if (project && project.user_id !== user.id) {
-          await supabase.from('notifications').insert({
-             user_id: project.user_id,
-             actor_name: user.user_metadata?.full_name || user.user_metadata?.user_name || user.email.split('@')[0] || 'A Builder',
-             actor_avatar: user.user_metadata?.avatar_url || 'https://www.gravatar.com/avatar/?d=mp',
-             project_id: projectId,
-             project_title: project.title,
-             type: 'vouch'
-          });
+    if (isCurrentlyVouched) {
+      // 1. UN-VOUCH: Remove from local state immediately for snappy UI
+      setVouchedIds(prev => prev.filter(id => id !== projectId));
+      setGlobalVouchCounts(prev => ({ ...prev, [projectId]: Math.max(0, (prev[projectId] || 1) - 1) }));
+      
+      // 2. Remove from database
+      try {
+        await supabase.from('vouches').delete().match({ project_id: projectId, voucher_id: user.id });
+      } catch (e) {
+        console.error("Error un-vouching:", e);
       }
+    } else {
+      // 1. VOUCH: Add to local state immediately for snappy UI
+      setVouchedIds(prev => [...prev, projectId]);
+      setGlobalVouchCounts(prev => ({ ...prev, [projectId]: (prev[projectId] || 0) + 1 }));
+      
+      // 2. Add to database
+      try {
+        await supabase.from('vouches').insert({ project_id: projectId, voucher_id: user.id });
 
-    } catch (e) {}
+        // 3. Send Notification to owner
+        if (project && project.user_id !== user.id) {
+            await supabase.from('notifications').insert({
+               user_id: project.user_id,
+               actor_name: user.user_metadata?.full_name || user.user_metadata?.user_name || user.email.split('@')[0] || 'A Builder',
+               actor_avatar: user.user_metadata?.avatar_url || 'https://www.gravatar.com/avatar/?d=mp',
+               project_id: projectId,
+               project_title: project.title,
+               type: 'vouch'
+            });
+        }
+      } catch (e) {
+        console.error("Error vouching:", e);
+      }
+    }
   }
 
   const handleCreateProject = async (e) => {
@@ -362,6 +378,7 @@ export default function VouchNetworkFeed() {
   )
 
   const myProjects = projects.filter(p => p.user_id === user.id);
+  
   const topSkills = Object.entries(
     myProjects.reduce((acc, proj) => {
       const skillsList = (proj.skills && proj.skills.length > 0) ? proj.skills : [proj.tag || 'Protocol'];
@@ -452,7 +469,6 @@ export default function VouchNetworkFeed() {
 
         <div className="flex items-center gap-6">
           
-          {/* --- NEW: Interactive Notification Bell --- */}
           <div className="relative">
             <div className="relative cursor-pointer" onClick={handleToggleNotifications}>
               <Bell size={20} className={`transition-colors ${showNotifications ? 'text-white' : 'text-gray-400 hover:text-white'}`} />
@@ -574,7 +590,7 @@ export default function VouchNetworkFeed() {
                     currentUserId={user.id}
                     vouchCount={globalVouchCounts[proj.id] || 0}
                     vouched={vouchedIds.includes(proj.id)}
-                    onVouch={() => handleVouch(proj.id)}
+                    onVouch={() => handleToggleVouch(proj.id)}
                     onUpdateProject={updateProjectInDb}
                     onDeleteProject={deleteProjectInDb}
                   />
@@ -669,7 +685,6 @@ function FeedCard({ id, user_id, title, tag, skills, desc, link, vouchCount, onV
       if (data) setComments(prev => [...prev, data[0]]);
       setNewComment('');
 
-      // --- NEW: Send Notification to Project Owner ---
       if (!isOwner) {
           supabase.from('notifications').insert({
              user_id: user_id, 
@@ -678,7 +693,7 @@ function FeedCard({ id, user_id, title, tag, skills, desc, link, vouchCount, onV
              project_id: id,
              project_title: title,
              type: 'comment'
-          }).then(); // Fire and forget
+          }).then();
       }
 
     } catch (err) {
@@ -812,9 +827,10 @@ function FeedCard({ id, user_id, title, tag, skills, desc, link, vouchCount, onV
           </a>
       </div>
 
+      {/* --- FIX: UPDATED VOUCH BUTTON UI (REMOVED DISABLED STATE) --- */}
       <div className="flex items-center justify-between pt-4 border-t border-white/5">
          <div className="flex items-center gap-6">
-            <button onClick={onVouch} disabled={vouched} className={`flex items-center gap-2 text-sm font-medium transition-colors ${vouched ? 'text-blue-500 cursor-default' : 'text-gray-400 hover:text-white'}`}>
+            <button onClick={onVouch} className={`flex items-center gap-2 text-sm font-medium transition-colors ${vouched ? 'text-blue-500 hover:text-blue-400' : 'text-gray-400 hover:text-white'}`}>
                <Heart size={18} className={vouched ? 'fill-blue-500' : ''} />
                <span>{vouchCount}</span>
             </button>
