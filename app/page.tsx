@@ -177,7 +177,6 @@ export default function VouchNetworkFeed() {
     }
   }
 
-  // --- FIX: TRUE TOGGLE VOUCH LOGIC ---
   const handleToggleVouch = async (projectId) => {
     if (!user?.id) return;
     
@@ -185,26 +184,21 @@ export default function VouchNetworkFeed() {
     const isCurrentlyVouched = vouchedIds.includes(projectId);
 
     if (isCurrentlyVouched) {
-      // 1. UN-VOUCH: Remove from local state immediately for snappy UI
       setVouchedIds(prev => prev.filter(id => id !== projectId));
       setGlobalVouchCounts(prev => ({ ...prev, [projectId]: Math.max(0, (prev[projectId] || 1) - 1) }));
       
-      // 2. Remove from database
       try {
         await supabase.from('vouches').delete().match({ project_id: projectId, voucher_id: user.id });
       } catch (e) {
         console.error("Error un-vouching:", e);
       }
     } else {
-      // 1. VOUCH: Add to local state immediately for snappy UI
       setVouchedIds(prev => [...prev, projectId]);
       setGlobalVouchCounts(prev => ({ ...prev, [projectId]: (prev[projectId] || 0) + 1 }));
       
-      // 2. Add to database
       try {
         await supabase.from('vouches').insert({ project_id: projectId, voucher_id: user.id });
 
-        // 3. Send Notification to owner
         if (project && project.user_id !== user.id) {
             await supabase.from('notifications').insert({
                user_id: project.user_id,
@@ -827,7 +821,6 @@ function FeedCard({ id, user_id, title, tag, skills, desc, link, vouchCount, onV
           </a>
       </div>
 
-      {/* --- FIX: UPDATED VOUCH BUTTON UI (REMOVED DISABLED STATE) --- */}
       <div className="flex items-center justify-between pt-4 border-t border-white/5">
          <div className="flex items-center gap-6">
             <button onClick={onVouch} className={`flex items-center gap-2 text-sm font-medium transition-colors ${vouched ? 'text-blue-500 hover:text-blue-400' : 'text-gray-400 hover:text-white'}`}>
