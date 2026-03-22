@@ -3,7 +3,7 @@
 'use client'
 
 import { createBrowserClient } from '@supabase/ssr'
-import { useEffect, useState } from 'react'
+import { useEffect, useState, Suspense } from 'react'
 import { useParams } from 'next/navigation'
 import Link from 'next/link'
 import { motion, AnimatePresence } from 'framer-motion'
@@ -12,7 +12,6 @@ import {
   ExternalLink, Sparkles, Trophy, Github, Globe, UserPlus, Check
 } from 'lucide-react'
 
-// --- HELPER FUNCTION: REALTIME TIME AGO ---
 function timeAgo(dateString) {
   if (!dateString) return "Unknown time";
   const date = new Date(dateString);
@@ -31,7 +30,8 @@ function timeAgo(dateString) {
   return Math.floor(seconds) + " seconds ago";
 }
 
-export default function PublicProfile() {
+// --- FIX 1: Renamed to ProfileContent so we can wrap it in Suspense below ---
+function ProfileContent() {
   const { id } = useParams()
   const [currentUser, setCurrentUser] = useState(null)
   const [profileUser, setProfileUser] = useState(null)
@@ -40,7 +40,6 @@ export default function PublicProfile() {
   const [vouchedIds, setVouchedIds] = useState([])
   const [globalVouchCounts, setGlobalVouchCounts] = useState({})
   
-  // --- NEW: Connection State ---
   const [isFollowing, setIsFollowing] = useState(false)
   const [followerCount, setFollowerCount] = useState(0)
 
@@ -71,12 +70,10 @@ export default function PublicProfile() {
           const { data: myVouches } = await supabase.from('vouches').select('project_id').eq('voucher_id', loggedInUser.id)
           if (myVouches) setVouchedIds(myVouches.map(v => v.project_id))
           
-          // Check if I am following this profile
           const { data: connection } = await supabase.from('connections').select('*').eq('follower_id', loggedInUser.id).eq('following_id', id)
           if (connection && connection.length > 0) setIsFollowing(true)
         }
 
-        // Get this profile's total followers
         const { data: followers } = await supabase.from('connections').select('follower_id').eq('following_id', id)
         if (followers) setFollowerCount(followers.length)
 
@@ -98,27 +95,46 @@ export default function PublicProfile() {
     loadProfile()
   }, [id])
 
-  // --- NEW: Handle Connect / Follow Logic ---
+  // --- FIX 2: Connect Logic with Ghost Trap ---
   const handleConnect = async () => {
       if (!currentUser) return alert("You must be logged in to connect with builders!");
       
-      if (isFollowing) {
-          setIsFollowing(false);
-          setFollowerCount(prev => prev - 1);
-          await supabase.from('connections').delete().match({ follower_id: currentUser.id, following_id: id });
-      } else {
-          setIsFollowing(true);
-          setFollowerCount(prev => prev + 1);
-          await supabase.from('connections').insert({ follower_id: currentUser.id, following_id: id });
-          
-          // Send notification!
-          await supabase.from('notifications').insert({
-             user_id: id, 
-             actor_name: currentUser.user_metadata?.full_name || currentUser.user_metadata?.user_name || currentUser.email.split('@')[0] || 'A Builder',
-             actor_avatar: currentUser.user_metadata?.avatar_url || 'https://www.gravatar.com/avatar/?d=mp',
-             type: 'connect',
-             project_title: 'your network' // Reusing this column for the UI message format
-          });
+      try {
+        if (isFollowing) {
+            // Unfollow
+            setIsFollowing(false);
+            setFollowerCount(prev => prev - 1);
+            
+            const { error } = await supabase.from('connections').delete().match({ follower_id: currentUser.id, following_id: id });
+            if (error) throw error;
+        } else {
+            // Follow
+            setIsFollowing(true);
+            setFollowerCount(prev => prev + 1);
+            
+            const { data, error } = await supabase.from('connections').insert([{ follower_id: currentUser.id, following_id: id }]).select();
+            if (error) throw error;
+
+            // THE GHOST TRAP
+            if (!data || data.length === 0) {
+                alert("Save Blocked! Please go to Supabase -> Table Editor -> 'connections' -> and turn OFF Row Level Security (RLS).");
+                setIsFollowing(false);
+                setFollowerCount(prev => prev - 1);
+                return;
+            }
+            
+            await supabase.from('notifications').insert([{
+               user_id: id, 
+               actor_name: currentUser.user_metadata?.full_name || currentUser.user_metadata?.user_name || currentUser.email.split('@')[0] || 'A Builder',
+               actor_avatar: currentUser.user_metadata?.avatar_url || 'https://www.gravatar.com/avatar/?d=mp',
+               type: 'connect',
+               project_title: 'your network' 
+            }]);
+        }
+      } catch (err) {
+          alert("Database Error: " + err.message);
+          setIsFollowing(!isFollowing); 
+          setFollowerCount(prev => isFollowing ? prev + 1 : prev - 1);
       }
   }
 
@@ -147,6 +163,7 @@ export default function PublicProfile() {
     </div>
   )
 
+  // --- FIX 3: Iterate through ALL skills for the leaderboard ---
   const topSkills = Object.entries(
     projects.reduce((acc, proj) => {
       const skillsList = (proj.skills && proj.skills.length > 0) ? proj.skills : [proj.tag || 'Protocol'];
@@ -198,7 +215,6 @@ export default function PublicProfile() {
                     <div><p className="text-2xl font-bold text-purple-400">{followerCount}</p><p className="text-xs text-gray-500 uppercase tracking-wider font-bold">Followers</p></div>
                  </div>
                  
-                 {/* --- NEW: Connect / Follow Button --- */}
                  {currentUser && currentUser.id !== id && (
                     <div className="sm:ml-auto">
                       <button onClick={handleConnect} className={`px-6 py-3 rounded-xl font-bold text-sm flex items-center gap-2 transition-all shadow-lg ${isFollowing ? 'bg-white/10 text-white hover:bg-red-500/20 hover:text-red-400 hover:border-red-500/30 shadow-none border border-transparent' : 'bg-blue-600 text-white hover:bg-blue-500 shadow-blue-600/20'}`}>
@@ -314,5 +330,14 @@ function ProfileProjectCard({ id, title, tag, skills, desc, link, vouchCount, on
          </div>
       </div>
     </motion.div>
+  )
+}
+
+// --- THIS IS THE PROPER SUSPENSE WRAPPER ---
+export default function PublicProfile() {
+  return (
+    <Suspense fallback={<div className="h-screen bg-[#0A0D14] flex items-center justify-center text-blue-500 animate-pulse font-bold text-2xl">Loading Profile...</div>}>
+      <ProfileContent />
+    </Suspense>
   )
 }
