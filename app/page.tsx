@@ -37,7 +37,12 @@ export default function VouchNetworkFeed() {
   const [user, setUser] = useState(null)
   const [loading, setLoading] = useState(true)
   const [isSyncing, setIsSyncing] = useState(false)
-  const [projects, setProjects] = useState([])
+  
+  // --- NEW: Split states for Feed vs Sidebar ---
+  const [feedProjects, setFeedProjects] = useState([])
+  const [myProjects, setMyProjects] = useState([])
+  const [isSearching, setIsSearching] = useState(false)
+
   const [vouchedIds, setVouchedIds] = useState([]) 
   const [globalVouchCounts, setGlobalVouchCounts] = useState({})
 
@@ -107,7 +112,8 @@ export default function VouchNetworkFeed() {
           } else if (githubUsername) {
             await fetchAndSaveGitHubRepos(githubUsername, globalDbProjects || [], false, currentUser)
           } else if (globalDbProjects) {
-            setProjects(globalDbProjects)
+            setFeedProjects(globalDbProjects)
+            setMyProjects(globalDbProjects.filter(p => p.user_id === currentUser.id))
           }
         }
       } catch (e) {
@@ -118,6 +124,32 @@ export default function VouchNetworkFeed() {
     }
     initializeProtocol()
   }, [])
+
+  // --- NEW: Global Debounced Database Search ---
+  useEffect(() => {
+    // Prevent search from running during the initial page load
+    if (loading || isSyncing || !user) return;
+
+    const delayDebounceFn = setTimeout(async () => {
+      setIsSearching(true);
+      
+      let dbQuery = supabase.from('projects').select('*').order('created_at', { ascending: false });
+      
+      // If user typed something, add the 'OR' filter to search multiple columns globally
+      if (searchQuery.trim() !== '') {
+         dbQuery = dbQuery.or(`title.ilike.%${searchQuery}%,author_name.ilike.%${searchQuery}%,tag.ilike.%${searchQuery}%,desc.ilike.%${searchQuery}%`);
+      }
+      
+      const { data, error } = await dbQuery.limit(50);
+      
+      if (!error && data) {
+         setFeedProjects(data);
+      }
+      setIsSearching(false);
+    }, 400); // Wait 400ms after user stops typing before hitting the database
+
+    return () => clearTimeout(delayDebounceFn);
+  }, [searchQuery, user, loading, isSyncing]);
 
   const handleToggleNotifications = async () => {
     setShowNotifications(!showNotifications);
@@ -136,7 +168,8 @@ export default function VouchNetworkFeed() {
       const res = await fetch(url, { headers })
       
       if (!res.ok) {
-        setProjects(existingDbProjects)
+        setFeedProjects(existingDbProjects)
+        setMyProjects(existingDbProjects.filter(p => p.user_id === currentUser.id))
         return
       }
 
@@ -167,11 +200,14 @@ export default function VouchNetworkFeed() {
            }
         }
 
-        setProjects([...uniqueGithubData, ...existingDbProjects].sort((a,b) => new Date(b.created_at) - new Date(a.created_at)))
+        const finalProjects = [...uniqueGithubData, ...existingDbProjects].sort((a,b) => new Date(b.created_at) - new Date(a.created_at))
+        setFeedProjects(finalProjects)
+        setMyProjects(finalProjects.filter(p => p.user_id === currentUser.id))
       }
     } catch (e) { 
       console.error("Sync error:", e)
-      setProjects(existingDbProjects)
+      setFeedProjects(existingDbProjects)
+      setMyProjects(existingDbProjects.filter(p => p.user_id === currentUser.id))
     } finally { 
       setIsSyncing(false) 
     }
@@ -180,7 +216,7 @@ export default function VouchNetworkFeed() {
   const handleToggleVouch = async (projectId) => {
     if (!user?.id) return;
     
-    const project = projects.find(p => p.id === projectId);
+    const project = feedProjects.find(p => p.id === projectId) || myProjects.find(p => p.id === projectId);
     const isCurrentlyVouched = vouchedIds.includes(projectId);
 
     if (isCurrentlyVouched) {
@@ -241,7 +277,8 @@ export default function VouchNetworkFeed() {
       const { error } = await supabase.from('projects').insert([newProject])
       if (error) throw error
 
-      setProjects(prev => [newProject, ...prev])
+      setFeedProjects(prev => [newProject, ...prev])
+      setMyProjects(prev => [newProject, ...prev])
       setIsAddingProject(false)
       setNewProjectForm({ title: '', desc: '', link: '', tag: '', image_url: '' })
     } catch (error) {
@@ -309,7 +346,8 @@ export default function VouchNetworkFeed() {
           return
       }
 
-      setProjects(prev => prev.map(p => p.id === projectId ? { ...p, ...updates } : p))
+      setFeedProjects(prev => prev.map(p => p.id === projectId ? { ...p, ...updates } : p))
+      setMyProjects(prev => prev.map(p => p.id === projectId ? { ...p, ...updates } : p))
     } catch (error) { alert("Supabase Error: " + error.message) }
   }
 
@@ -320,7 +358,8 @@ export default function VouchNetworkFeed() {
     try {
       const { error } = await supabase.from('projects').delete().eq('id', projectId);
       if (error) throw error;
-      setProjects(prev => prev.filter(p => p.id !== projectId));
+      setFeedProjects(prev => prev.filter(p => p.id !== projectId));
+      setMyProjects(prev => prev.filter(p => p.id !== projectId));
     } catch (error) {
       alert("Error deleting project: " + error.message);
     }
@@ -365,14 +404,6 @@ export default function VouchNetworkFeed() {
     )
   }
 
-  const displayedProjects = projects.filter(p => 
-    p.title.toLowerCase().includes(searchQuery.toLowerCase()) || 
-    (p.tag && p.tag.toLowerCase().includes(searchQuery.toLowerCase())) ||
-    (p.author_name && p.author_name.toLowerCase().includes(searchQuery.toLowerCase()))
-  )
-
-  const myProjects = projects.filter(p => p.user_id === user.id);
-  
   const topSkills = Object.entries(
     myProjects.reduce((acc, proj) => {
       const skillsList = (proj.skills && proj.skills.length > 0) ? proj.skills : [proj.tag || 'Protocol'];
@@ -456,9 +487,14 @@ export default function VouchNetworkFeed() {
           <span className="text-xl font-bold tracking-tight hidden md:block">Vouch</span>
         </div>
 
+        {/* --- NEW: Global Loading Spinner for Search --- */}
         <div className="hidden md:flex items-center bg-[#151821] rounded-full px-5 py-2.5 w-[500px] border border-white/5 focus-within:border-blue-500/50 transition-colors">
-           <Search size={18} className="text-gray-500 mr-3" />
-           <input type="text" value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} placeholder="Search projects, skills, or builders..." className="bg-transparent border-none outline-none text-sm w-full text-white placeholder-gray-500" />
+           {isSearching ? (
+             <RefreshCw size={18} className="text-blue-500 mr-3 animate-spin" />
+           ) : (
+             <Search size={18} className="text-gray-500 mr-3" />
+           )}
+           <input type="text" value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} placeholder="Search the global network..." className="bg-transparent border-none outline-none text-sm w-full text-white placeholder-gray-500" />
         </div>
 
         <div className="flex items-center gap-6">
@@ -575,8 +611,9 @@ export default function VouchNetworkFeed() {
            </div>
 
            <div className="space-y-6">
-              {displayedProjects.length > 0 ? (
-                displayedProjects.map((proj) => (
+              {/* --- NEW: Map over feedProjects directly! --- */}
+              {feedProjects.length > 0 ? (
+                feedProjects.map((proj) => (
                   <FeedCard 
                     key={proj.id} 
                     {...proj} 
@@ -591,7 +628,7 @@ export default function VouchNetworkFeed() {
                 ))
               ) : (
                 <div className="bg-[#151821] border border-white/5 rounded-3xl p-16 text-center">
-                  {searchQuery ? (<p className="text-gray-400 font-medium">No projects match "{searchQuery}"</p>) : (<><RefreshCw size={32} className="text-gray-600 mx-auto mb-4 animate-spin" /><p className="text-gray-400 font-medium">Syncing global network...</p></>)}
+                  {searchQuery ? (<p className="text-gray-400 font-medium">No projects match "{searchQuery}" on the global network.</p>) : (<><RefreshCw size={32} className="text-gray-600 mx-auto mb-4 animate-spin" /><p className="text-gray-400 font-medium">Syncing global network...</p></>)}
                 </div>
               )}
            </div>
