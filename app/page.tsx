@@ -11,7 +11,7 @@ import {
   Search, Bell, MessageSquare, Flame, Clock, Filter, 
   CheckCircle2, MoreHorizontal, Sparkles, Trophy, 
   Github, LogOut, Heart, Plus, Zap, RefreshCw, ExternalLink, ArrowRight, Mail,
-  Edit2, X, Save, ImageIcon, Trash2, Users, Globe
+  Edit2, X, Save, ImageIcon, Trash2, Users, Globe, User
 } from 'lucide-react'
 import { signOut } from './actions'
 
@@ -48,7 +48,6 @@ export default function VouchNetworkFeed() {
   const [notifications, setNotifications] = useState([])
   const [unreadCount, setUnreadCount] = useState(0)
 
-  // --- NEW: Added 'trending' to the filter state ---
   const [feedFilter, setFeedFilter] = useState('global') 
   const [followingIds, setFollowingIds] = useState([])
 
@@ -435,7 +434,6 @@ export default function VouchNetworkFeed() {
     )
   }
 
-  // --- NEW: Calculate the active projects based on the 3 filters! ---
   let activeProjects = feedProjects;
   if (feedFilter === 'following') {
     activeProjects = feedProjects.filter(p => followingIds.includes(p.user_id));
@@ -457,7 +455,7 @@ export default function VouchNetworkFeed() {
   ).map(([name, count]) => ({ name, count })).sort((a, b) => b.count - a.count).slice(0, 5);
 
   return (
-    <main className="min-h-screen bg-[#0A0D14] text-white font-sans selection:bg-blue-500/30 relative">
+    <main className="min-h-screen bg-[#0A0D14] text-white font-sans selection:bg-blue-500/30 relative pb-24 md:pb-0">
       
       <AnimatePresence>
         {isEditingProfile && (
@@ -488,9 +486,9 @@ export default function VouchNetworkFeed() {
 
       <AnimatePresence>
         {isAddingProject && (
-          <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="fixed inset-0 z-[100] bg-black/80 backdrop-blur-sm flex items-center justify-center p-4 overflow-y-auto">
-            <motion.div initial={{ scale: 0.95, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} exit={{ scale: 0.95, opacity: 0 }} className="bg-[#151821] border border-white/10 rounded-3xl p-6 sm:p-8 w-full max-w-lg relative my-8">
-              <button onClick={() => setIsAddingProject(false)} className="absolute top-4 right-4 p-2 text-gray-400 hover:text-white bg-white/5 rounded-full"><X size={18} /></button>
+          <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="fixed inset-0 z-[100] bg-black/80 backdrop-blur-sm flex items-center justify-center p-0 md:p-4 overflow-y-auto">
+            <motion.div initial={{ scale: 0.95, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} exit={{ scale: 0.95, opacity: 0 }} className="bg-[#151821] border border-white/10 rounded-none sm:rounded-3xl p-6 sm:p-8 w-full max-w-lg relative min-h-screen sm:min-h-0 pt-16 sm:pt-8 flex flex-col justify-start sm:justify-center">
+              <button onClick={() => setIsAddingProject(false)} className="absolute top-6 right-6 sm:top-4 sm:right-4 p-2 text-gray-400 hover:text-white bg-white/5 rounded-full"><X size={18} /></button>
               <h2 className="text-xl font-bold text-white mb-6 flex items-center gap-2"><Sparkles className="text-blue-500" size={20}/> Post a Project</h2>
               <form onSubmit={handleCreateProject} className="space-y-4">
                 <div>
@@ -522,31 +520,25 @@ export default function VouchNetworkFeed() {
         )}
       </AnimatePresence>
 
-      <nav className="sticky top-0 z-50 bg-[#0A0D14]/90 backdrop-blur-xl border-b border-white/5 px-4 md:px-8 py-4 flex items-center justify-between">
+      {/* --- DESKTOP TOP NAV --- */}
+      <nav className="hidden md:flex sticky top-0 z-50 bg-[#0A0D14]/90 backdrop-blur-xl border-b border-white/5 px-4 md:px-8 py-4 items-center justify-between">
         <div className="flex items-center gap-3">
           <div className="w-8 h-8 bg-blue-600 rounded-xl flex items-center justify-center shadow-lg shadow-blue-500/20">
             <CheckCircle2 size={18} className="text-white" strokeWidth={3}/>
           </div>
-          <span className="text-xl font-bold tracking-tight hidden md:block">Vouch</span>
+          <span className="text-xl font-bold tracking-tight">Vouch</span>
         </div>
 
-        <div className="hidden md:flex items-center bg-[#151821] rounded-full px-5 py-2.5 w-[500px] border border-white/5 focus-within:border-blue-500/50 transition-colors">
-           {isSearching ? (
-             <RefreshCw size={18} className="text-blue-500 mr-3 animate-spin" />
-           ) : (
-             <Search size={18} className="text-gray-500 mr-3" />
-           )}
+        <div className="flex items-center bg-[#151821] rounded-full px-5 py-2.5 w-[500px] border border-white/5 focus-within:border-blue-500/50 transition-colors">
+           {isSearching ? <RefreshCw size={18} className="text-blue-500 mr-3 animate-spin" /> : <Search size={18} className="text-gray-500 mr-3" />}
            <input type="text" value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} placeholder="Search the global network..." className="bg-transparent border-none outline-none text-sm w-full text-white placeholder-gray-500" />
         </div>
 
         <div className="flex items-center gap-6">
-          
           <div className="relative">
             <div className="relative cursor-pointer" onClick={handleToggleNotifications}>
               <Bell size={20} className={`transition-colors ${showNotifications ? 'text-white' : 'text-gray-400 hover:text-white'}`} />
-              {unreadCount > 0 && (
-                <div className="absolute -top-1 -right-1 w-2.5 h-2.5 bg-red-500 rounded-full border-2 border-[#0A0D14]"></div>
-              )}
+              {unreadCount > 0 && <div className="absolute -top-1 -right-1 w-2.5 h-2.5 bg-red-500 rounded-full border-2 border-[#0A0D14]"></div>}
             </div>
             
             {showNotifications && (
@@ -567,15 +559,13 @@ export default function VouchNetworkFeed() {
                         </div>
                       </div>
                     ))
-                  ) : (
-                    <p className="text-xs text-gray-500 text-center italic py-4">No notifications yet.</p>
-                  )}
+                  ) : (<p className="text-xs text-gray-500 text-center italic py-4">No notifications yet.</p>)}
                 </div>
               </div>
             )}
           </div>
           
-          <MessageSquare size={20} className="text-gray-400 hover:text-white cursor-pointer transition-colors hidden sm:block" />
+          <MessageSquare size={20} className="text-gray-400 hover:text-white cursor-pointer transition-colors" />
           
           <div className="flex items-center gap-3 pl-4 border-l border-white/10">
              <button onClick={() => setIsEditingProfile(true)} className="relative group rounded-full overflow-hidden border border-white/10 focus:ring-2 focus:ring-blue-500 transition-all">
@@ -587,8 +577,77 @@ export default function VouchNetworkFeed() {
        </div>
       </nav>
 
-      <div className="max-w-[1400px] mx-auto px-4 md:px-8 pt-10 pb-20 grid grid-cols-1 lg:grid-cols-4 gap-8">
+      {/* --- MOBILE TOP NAV --- */}
+      <nav className="md:hidden sticky top-0 z-40 bg-[#0A0D14]/80 backdrop-blur-md border-b border-white/5 px-5 py-4 flex items-center justify-between">
+         <div className="flex items-center gap-2">
+           <div className="w-7 h-7 bg-blue-600 rounded-lg flex items-center justify-center"><CheckCircle2 size={14} className="text-white" strokeWidth={3}/></div>
+           <span className="font-bold text-lg tracking-tight">Vouch</span>
+         </div>
+         <div className="flex items-center gap-4">
+            <div className="relative">
+              <button onClick={handleToggleNotifications} className="relative p-2 text-gray-400 hover:text-white">
+                 <Bell size={20} />
+                 {unreadCount > 0 && <div className="absolute top-1 right-2 w-2 h-2 bg-red-500 rounded-full border border-[#0A0D14]" />}
+              </button>
+              {showNotifications && (
+                <div className="absolute top-12 -right-12 w-[300px] bg-[#151821] border border-white/10 rounded-2xl shadow-2xl p-4 z-50">
+                  <h3 className="text-sm font-bold text-white mb-3">Notifications</h3>
+                  <div className="space-y-3 max-h-[300px] overflow-y-auto custom-scrollbar">
+                    {notifications.length > 0 ? (
+                      notifications.map(n => (
+                        <div key={n.id} className={`flex gap-3 items-start p-3 rounded-xl ${n.is_read ? 'bg-white/5 opacity-70' : 'bg-blue-500/10 border border-blue-500/20'}`}>
+                          <div className={`p-2 rounded-lg ${n.type === 'vouch' ? 'bg-blue-500/20 text-blue-400' : 'bg-purple-500/20 text-purple-400'}`}>
+                             {n.type === 'vouch' ? <Heart size={14}/> : <MessageSquare size={14}/>}
+                          </div>
+                          <div>
+                             <p className="text-xs text-gray-300"><span className="text-white font-bold">{n.actor_name}</span> {n.type === 'vouch' ? 'vouched' : 'commented'}</p>
+                             <p className="text-[10px] text-gray-500 mt-1">{timeAgo(n.created_at)}</p>
+                          </div>
+                        </div>
+                      ))
+                    ) : (<p className="text-xs text-gray-500 text-center italic py-4">No notifications yet.</p>)}
+                  </div>
+                </div>
+              )}
+            </div>
+            <button onClick={() => setIsEditingProfile(true)} className="rounded-full overflow-hidden border border-white/10"><img src={user.user_metadata?.avatar_url || 'https://www.gravatar.com/avatar/?d=mp'} className="w-8 h-8 object-cover" /></button>
+         </div>
+      </nav>
+
+      {/* --- MOBILE SEARCH & FILTERS --- */}
+      <div className="md:hidden px-4 pt-4 space-y-4">
+          <div className="relative">
+             {isSearching ? <RefreshCw size={16} className="absolute left-4 top-1/2 -translate-y-1/2 text-blue-500 animate-spin" /> : <Search size={16} className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-500" />}
+             <input 
+                type="text" 
+                value={searchQuery} 
+                onChange={(e) => setSearchQuery(e.target.value)} 
+                placeholder="Search builders or tech..." 
+                className="w-full bg-[#151821] border border-white/5 rounded-2xl py-3.5 pl-11 pr-4 text-sm text-white outline-none focus:border-blue-500/50 transition-all"
+             />
+          </div>
+
+          <div className="flex gap-2 overflow-x-auto pb-2 custom-scrollbar scroll-smooth">
+             {[
+               { id: 'global', icon: Globe, label: 'Global', color: 'text-blue-500' },
+               { id: 'trending', icon: Flame, label: 'Trending', color: 'text-orange-500' },
+               { id: 'following', icon: Users, label: 'Following', color: 'text-purple-500' }
+             ].map((f) => (
+               <button 
+                  key={f.id}
+                  onClick={() => setFeedFilter(f.id)}
+                  className={`flex items-center gap-2 px-5 py-2.5 rounded-xl text-sm font-semibold whitespace-nowrap border transition-all ${feedFilter === f.id ? 'bg-[#232733] text-white shadow-sm border-white/5' : 'bg-transparent border-transparent text-gray-500 hover:text-gray-400'}`}
+               >
+                  <f.icon size={16} className={feedFilter === f.id ? f.color : ''} /> {f.label}
+               </button>
+             ))}
+          </div>
+      </div>
+
+
+      <div className="max-w-[1400px] mx-auto px-4 md:px-8 pt-4 md:pt-10 grid grid-cols-1 lg:grid-cols-4 gap-8">
         
+        {/* --- DESKTOP SIDEBAR --- */}
         <aside className="hidden lg:flex flex-col gap-6">
            <div className="bg-[#151821] rounded-3xl p-8 flex flex-col items-center relative border border-white/5 overflow-hidden group">
              <div className="absolute top-0 left-0 w-full h-24 bg-gradient-to-b from-blue-600/20 to-transparent" />
@@ -641,10 +700,11 @@ export default function VouchNetworkFeed() {
            </div>
         </aside>
 
-        <div className="col-span-1 lg:col-span-3 space-y-8">
+        {/* --- FEED SECTION --- */}
+        <div className="col-span-1 lg:col-span-3 space-y-6 sm:space-y-8">
            
-           {/* --- NEW: The 3-Button Filter System --- */}
-           <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-4">
+           {/* DESKTOP 3-Button Filter System */}
+           <div className="hidden md:flex flex-col sm:flex-row sm:justify-between sm:items-center gap-4">
               <div className="flex bg-[#151821] p-1.5 rounded-2xl border border-white/5 w-fit">
                 <button 
                   onClick={() => setFeedFilter('global')}
@@ -665,9 +725,6 @@ export default function VouchNetworkFeed() {
                   <Users size={16} className={feedFilter === 'following' ? 'text-purple-500' : ''}/> Following
                 </button>
               </div>
-              <button onClick={() => setIsAddingProject(true)} className="lg:hidden flex items-center gap-2 px-5 py-2.5 bg-blue-600 rounded-2xl text-sm font-bold text-white transition-colors">
-                <Plus size={16}/> Post Project
-              </button>
            </div>
 
            <div className="space-y-6">
@@ -686,7 +743,7 @@ export default function VouchNetworkFeed() {
                   />
                 ))
               ) : (
-                <div className="bg-[#151821] border border-white/5 rounded-3xl p-16 text-center">
+                <div className="bg-[#151821] border border-white/5 rounded-3xl p-12 sm:p-16 text-center">
                   {feedFilter === 'following' ? (
                      <>
                         <Users size={32} className="text-gray-600 mx-auto mb-4" />
@@ -703,6 +760,22 @@ export default function VouchNetworkFeed() {
         </div>
 
       </div>
+
+      {/* --- MOBILE BOTTOM TAB BAR --- */}
+      <div className="md:hidden fixed bottom-0 inset-x-0 bg-[#151821]/95 backdrop-blur-xl border-t border-white/10 px-8 py-3 flex justify-between items-center z-50 pb-safe">
+         <button onClick={() => window.scrollTo({top: 0, behavior: 'smooth'})} className="flex flex-col items-center gap-1 text-blue-500">
+            <Globe size={22} />
+            <span className="text-[10px] font-bold">Feed</span>
+         </button>
+         <button onClick={() => setIsAddingProject(true)} className="bg-blue-600 p-3 rounded-2xl -mt-8 border-4 border-[#0A0D14] shadow-xl active:scale-90 transition-transform">
+            <Plus size={24} className="text-white" />
+         </button>
+         <Link href={`/profile/${user.id}`} className="flex flex-col items-center gap-1 text-gray-500 hover:text-gray-300">
+            <User size={22} />
+            <span className="text-[10px] font-bold">Profile</span>
+         </Link>
+      </div>
+
     </main>
   )
 }
@@ -826,19 +899,19 @@ function FeedCard({ id, user_id, title, tag, skills, desc, link, vouchCount, onV
   }
 
   return (
-    <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} className="bg-[#151821] border border-white/5 rounded-[2rem] p-6 sm:p-8 hover:border-white/10 transition-colors shadow-xl shadow-black/50">
+    <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} className="bg-[#151821] border border-white/5 rounded-[1.5rem] sm:rounded-[2rem] p-5 sm:p-8 hover:border-white/10 transition-colors shadow-xl shadow-black/50">
       
       <div className="flex justify-between items-start mb-6">
-         <div className="flex items-center gap-4">
+         <div className="flex items-center gap-3 sm:gap-4">
             <Link href={`/profile/${user_id}`}>
-              <img src={author_avatar || 'https://www.gravatar.com/avatar/?d=mp'} className="w-12 h-12 rounded-full border border-white/10 object-cover cursor-pointer hover:opacity-80 transition-opacity" alt="Author" />
+              <img src={author_avatar || 'https://www.gravatar.com/avatar/?d=mp'} className="w-10 h-10 sm:w-12 sm:h-12 rounded-full border border-white/10 object-cover cursor-pointer hover:opacity-80 transition-opacity" alt="Author" />
             </Link>
             <div>
               <Link href={`/profile/${user_id}`} className="flex items-center gap-1.5 cursor-pointer hover:underline decoration-white/30">
-                <h4 className="font-bold text-white tracking-tight">{author_name || 'Network Builder'}</h4>
-                <CheckCircle2 size={16} className="text-blue-500" strokeWidth={3} />
+                <h4 className="font-bold text-sm sm:text-base text-white tracking-tight">{author_name || 'Network Builder'}</h4>
+                <CheckCircle2 size={14} className="text-blue-500" strokeWidth={3} />
               </Link>
-              <p className="text-xs text-gray-500 font-medium mt-0.5">{author_designation || 'Builder'} • {timeAgo(created_at)}</p>
+              <p className="text-[10px] sm:text-xs text-gray-500 font-medium mt-0.5">{author_designation || 'Builder'} • {timeAgo(created_at)}</p>
             </div>
          </div>
 
@@ -869,12 +942,12 @@ function FeedCard({ id, user_id, title, tag, skills, desc, link, vouchCount, onV
         </div>
       ) : (
         <>
-          <h2 className="text-2xl sm:text-3xl font-bold text-white mb-3 tracking-tight">{title}</h2>
-          <p className="text-gray-400 text-sm sm:text-base leading-relaxed mb-6 max-w-3xl whitespace-pre-line">{desc}</p>
+          <h2 className="text-xl sm:text-2xl lg:text-3xl font-bold text-white mb-2 sm:mb-3 tracking-tight">{title}</h2>
+          <p className="text-gray-400 text-xs sm:text-sm lg:text-base leading-relaxed mb-6 max-w-3xl whitespace-pre-line">{desc}</p>
         </>
       )}
 
-      <div className="flex items-center gap-2 mb-8 group relative flex-wrap">
+      <div className="flex items-center gap-2 mb-6 sm:mb-8 group relative flex-wrap">
           {isEditingTags ? (
               <div className="flex items-center gap-2 bg-[#0A0D14] border border-white/10 rounded-lg p-1.5 w-full max-w-lg">
                 <input type="text" value={tempTags} onChange={(e) => setTempTags(e.target.value)} placeholder="Comma-separated skills..." className="bg-transparent border-none outline-none text-xs text-white px-2 py-0.5 w-full" autoFocus/>
@@ -884,8 +957,8 @@ function FeedCard({ id, user_id, title, tag, skills, desc, link, vouchCount, onV
           ) : (
             <>
                 {skills && skills.length > 0 ? (
-                    skills.map((skill, index) => (<span key={index} className="px-4 py-1.5 bg-white/5 border border-white/5 rounded-full text-xs text-gray-300 font-medium hover:bg-white/10 cursor-pointer transition-colors">{skill}</span>))
-                ) : (<span className="px-4 py-1.5 bg-white/5 border border-white/5 rounded-full text-xs text-gray-300 font-medium hover:bg-white/10 cursor-pointer transition-colors">{tag || 'Architecture'}</span>)}
+                    skills.map((skill, index) => (<span key={index} className="px-3 sm:px-4 py-1 sm:py-1.5 bg-white/5 border border-white/5 rounded-full text-[10px] sm:text-xs text-gray-300 font-medium hover:bg-white/10 cursor-pointer transition-colors">{skill}</span>))
+                ) : (<span className="px-3 sm:px-4 py-1 sm:py-1.5 bg-white/5 border border-white/5 rounded-full text-[10px] sm:text-xs text-gray-300 font-medium hover:bg-white/10 cursor-pointer transition-colors">{tag || 'Architecture'}</span>)}
                  
                  {isOwner && (
                    <button onClick={() => setIsEditingTags(true)} className="p-1.5 text-gray-600 hover:text-white bg-white/5 rounded-full opacity-0 group-hover:opacity-100 transition-all"><Edit2 size={12} /></button>
@@ -894,9 +967,9 @@ function FeedCard({ id, user_id, title, tag, skills, desc, link, vouchCount, onV
           )}
       </div>
 
-      <div className="relative group overflow-hidden rounded-2xl mb-6 border border-white/5 bg-[#0A0D14] min-h-[256px]">
+      <div className="relative group overflow-hidden rounded-2xl mb-6 border border-white/5 bg-[#0A0D14] min-h-[200px] sm:min-h-[256px]">
           {isEditingImage ? (
-              <div className="absolute inset-0 flex flex-col items-center justify-center gap-4 bg-[#151821] p-8 z-30">
+              <div className="absolute inset-0 flex flex-col items-center justify-center gap-4 bg-[#151821] p-4 sm:p-8 z-30">
                  <input type="text" value={tempImageUrl} onChange={(e) => setTempImageUrl(e.target.value)} placeholder="Paste new image URL..." className="w-full bg-[#0A0D14] border border-white/10 rounded-xl px-4 py-3 text-sm text-white outline-none focus:border-blue-500" autoFocus/>
                 <div className="flex gap-2">
                     <button onClick={saveImage} className="flex items-center gap-2 px-5 py-2.5 bg-green-600 hover:bg-green-500 text-white font-bold rounded-xl text-sm transition-colors"><Save size={14}/> Save Image</button>
@@ -912,32 +985,32 @@ function FeedCard({ id, user_id, title, tag, skills, desc, link, vouchCount, onV
           <a href={link || '#'} target={link ? "_blank" : "_self"} rel="noopener noreferrer" className={`block relative h-full ${!link && 'cursor-default'}`}>
              <div className="absolute inset-0 bg-gradient-to-t from-[#0A0D14] to-transparent z-10 opacity-60 group-hover:opacity-40 transition-opacity" />
              {image_url ? (
-                <img src={image_url} alt={title} className="w-full h-full object-cover rounded-2xl h-64 sm:h-80" />
+                <img src={image_url} alt={title} className="w-full h-full object-cover rounded-2xl h-48 sm:h-64 lg:h-80" />
              ) : (
-                 <div className="w-full h-64 sm:h-80 bg-gradient-to-br from-blue-900/20 via-[#151821] to-purple-900/20 flex flex-col items-center justify-center relative overflow-hidden">
+                 <div className="w-full h-48 sm:h-64 lg:h-80 bg-gradient-to-br from-blue-900/20 via-[#151821] to-purple-900/20 flex flex-col items-center justify-center relative overflow-hidden">
                     <div className="absolute w-[500px] h-[500px] bg-blue-500/10 blur-[100px] rounded-full -top-1/2 -left-1/4 group-hover:bg-blue-500/20 transition-colors duration-700" />
                     <Sparkles size={48} className="text-white/10 mb-4 z-20" />
                     <span className="font-mono text-white/20 text-3xl font-black tracking-widest uppercase z-20">{title.substring(0, 3)}</span>
                  </div>
              )}
              {link && (
-               <div className="absolute bottom-4 right-4 z-20 bg-white/10 backdrop-blur-md px-4 py-2 rounded-xl border border-white/10 flex items-center gap-2 opacity-0 group-hover:opacity-100 transition-all translate-y-2 group-hover:translate-y-0"><span className="text-xs font-bold text-white">View Source</span><ExternalLink size={14} className="text-white"/></div>
+               <div className="absolute bottom-4 right-4 z-20 bg-white/10 backdrop-blur-md px-4 py-2 rounded-xl border border-white/10 flex items-center gap-2 opacity-0 group-hover:opacity-100 transition-all translate-y-2 group-hover:translate-y-0"><span className="text-[10px] sm:text-xs font-bold text-white">View Source</span><ExternalLink size={12} className="text-white sm:w-3.5 sm:h-3.5"/></div>
              )}
           </a>
       </div>
 
       <div className="flex items-center justify-between pt-4 border-t border-white/5">
-         <div className="flex items-center gap-6">
-            <button onClick={onVouch} className={`flex items-center gap-2 text-sm font-medium transition-colors ${vouched ? 'text-blue-500 hover:text-blue-400' : 'text-gray-400 hover:text-white'}`}>
-               <Heart size={18} className={vouched ? 'fill-blue-500' : ''} />
+         <div className="flex items-center gap-4 sm:gap-6">
+            <button onClick={onVouch} className={`flex items-center gap-1.5 sm:gap-2 text-xs sm:text-sm font-medium transition-colors ${vouched ? 'text-blue-500 hover:text-blue-400' : 'text-gray-400 hover:text-white'}`}>
+               <Heart size={16} className={`sm:w-[18px] sm:h-[18px] ${vouched ? 'fill-blue-500' : ''}`} />
                <span>{vouchCount}</span>
             </button>
-            <button onClick={toggleComments} className={`flex items-center gap-2 text-sm font-medium transition-colors ${showComments ? 'text-white' : 'text-gray-400 hover:text-white'}`}>
-               <MessageSquare size={18} /><span>{comments.length > 0 ? `${comments.length} Comments` : 'Discuss'}</span>
+            <button onClick={toggleComments} className={`flex items-center gap-1.5 sm:gap-2 text-xs sm:text-sm font-medium transition-colors ${showComments ? 'text-white' : 'text-gray-400 hover:text-white'}`}>
+               <MessageSquare size={16} className="sm:w-[18px] sm:h-[18px]" /><span>{comments.length > 0 ? `${comments.length} Comments` : 'Discuss'}</span>
             </button>
          </div>
          {vouched && (
-           <div className="flex items-center gap-1.5 px-3 py-1 bg-blue-500/10 rounded-lg border border-blue-500/20"><CheckCircle2 size={14} className="text-blue-400" /><span className="text-[10px] font-bold text-blue-400 uppercase tracking-wide">Vouched</span></div>
+           <div className="flex items-center gap-1 sm:gap-1.5 px-2 sm:px-3 py-1 bg-blue-500/10 rounded-lg border border-blue-500/20"><CheckCircle2 size={12} className="text-blue-400 sm:w-3.5 sm:h-3.5" /><span className="text-[9px] sm:text-[10px] font-bold text-blue-400 uppercase tracking-wide">Vouched</span></div>
          )}
       </div>
 
@@ -995,7 +1068,7 @@ function FeedCard({ id, user_id, title, tag, skills, desc, link, vouchCount, onV
                 <button 
                   type="submit" 
                   disabled={isSubmittingComment || !newComment.trim()} 
-                  className="px-6 py-3 bg-blue-600 hover:bg-blue-500 disabled:opacity-50 text-white text-sm font-bold rounded-xl transition-colors"
+                  className="px-5 sm:px-6 py-2.5 sm:py-3 bg-blue-600 hover:bg-blue-500 disabled:opacity-50 text-white text-xs sm:text-sm font-bold rounded-xl transition-colors"
                 >
                   Post
                 </button>
