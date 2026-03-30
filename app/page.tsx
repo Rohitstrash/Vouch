@@ -11,7 +11,7 @@ import {
   Search, Bell, MessageSquare, Flame, Clock, Filter, 
   CheckCircle2, MoreHorizontal, Sparkles, Trophy, 
   Github, LogOut, Heart, Plus, Zap, RefreshCw, ExternalLink, ArrowRight, Mail,
-  Edit2, X, Save, ImageIcon, Trash2
+  Edit2, X, Save, ImageIcon, Trash2, Users
 } from 'lucide-react'
 import { signOut } from './actions'
 
@@ -47,6 +47,10 @@ export default function VouchNetworkFeed() {
 
   const [notifications, setNotifications] = useState([])
   const [unreadCount, setUnreadCount] = useState(0)
+
+  // --- NEW: Following State ---
+  const [feedFilter, setFeedFilter] = useState('global') // 'global' or 'following'
+  const [followingIds, setFollowingIds] = useState([])
 
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
@@ -95,10 +99,17 @@ export default function VouchNetworkFeed() {
           const { data: myVouches } = await supabase.from('vouches').select('project_id').eq('voucher_id', currentUser.id)
           if (myVouches) setVouchedIds(myVouches.map(v => v.project_id))
 
+          // Fetch notifications
           const { data: notifs } = await supabase.from('notifications').select('*').eq('user_id', currentUser.id).order('created_at', { ascending: false }).limit(20)
           if (notifs) {
               setNotifications(notifs)
               setUnreadCount(notifs.filter(n => !n.is_read).length)
+          }
+
+          // --- NEW: Fetch who the user is following ---
+          const { data: myConnections } = await supabase.from('connections').select('following_id').eq('follower_id', currentUser.id)
+          if (myConnections) {
+              setFollowingIds(myConnections.map(c => c.following_id))
           }
 
           const { data: globalDbProjects } = await supabase.from('projects').select('*').order('created_at', { ascending: false })
@@ -124,11 +135,9 @@ export default function VouchNetworkFeed() {
     initializeProtocol()
   }, [])
 
-  // --- NEW: The WebSocket Realtime Listener! ---
   useEffect(() => {
     if (!user?.id) return;
 
-    // Subscribe to INSERT events on the notifications table for THIS user
     const channel = supabase
       .channel('realtime-notifications')
       .on(
@@ -137,20 +146,16 @@ export default function VouchNetworkFeed() {
           event: 'INSERT',
           schema: 'public',
           table: 'notifications',
-          filter: `user_id=eq.${user.id}`, // Only listen for notifications meant for me
+          filter: `user_id=eq.${user.id}`, 
         },
         (payload) => {
-          // When a new notification hits the database, instantly update the UI!
           const newNotif = payload.new;
           setNotifications((prev) => [newNotif, ...prev]);
           setUnreadCount((prev) => prev + 1);
-          
-          // Optional: You could even trigger a browser sound or toast here!
         }
       )
       .subscribe();
 
-    // Cleanup the subscription when the component unmounts
     return () => {
       supabase.removeChannel(channel);
     };
@@ -432,6 +437,11 @@ export default function VouchNetworkFeed() {
     )
   }
 
+  // --- NEW: Apply the "Following" filter to the active projects! ---
+  const activeProjects = feedFilter === 'following' 
+    ? feedProjects.filter(p => followingIds.includes(p.user_id))
+    : feedProjects;
+
   const topSkills = Object.entries(
     myProjects.reduce((acc, proj) => {
       const skillsList = (proj.skills && proj.skills.length > 0) ? proj.skills : [proj.tag || 'Protocol'];
@@ -628,9 +638,21 @@ export default function VouchNetworkFeed() {
 
         <div className="col-span-1 lg:col-span-3 space-y-8">
            
+           {/* --- NEW: The Toggle Menu for Global vs Following --- */}
            <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-4">
               <div className="flex bg-[#151821] p-1.5 rounded-2xl border border-white/5 w-fit">
-                <button className="flex items-center gap-2 px-6 py-2.5 bg-[#232733] rounded-xl text-sm font-semibold text-white shadow-sm border border-white/5"><Flame size={16} className="text-orange-500"/> Global Feed</button>
+                <button 
+                  onClick={() => setFeedFilter('global')}
+                  className={`flex items-center gap-2 px-6 py-2.5 rounded-xl text-sm font-semibold transition-all ${feedFilter === 'global' ? 'bg-[#232733] text-white shadow-sm border border-white/5' : 'text-gray-500 hover:text-gray-400'}`}
+                >
+                  <Flame size={16} className={feedFilter === 'global' ? 'text-orange-500' : ''}/> Global
+                </button>
+                <button 
+                  onClick={() => setFeedFilter('following')}
+                  className={`flex items-center gap-2 px-6 py-2.5 rounded-xl text-sm font-semibold transition-all ${feedFilter === 'following' ? 'bg-[#232733] text-white shadow-sm border border-white/5' : 'text-gray-500 hover:text-gray-400'}`}
+                >
+                  <Users size={16} className={feedFilter === 'following' ? 'text-blue-500' : ''}/> Following
+                </button>
               </div>
               <button onClick={() => setIsAddingProject(true)} className="lg:hidden flex items-center gap-2 px-5 py-2.5 bg-blue-600 rounded-2xl text-sm font-bold text-white transition-colors">
                 <Plus size={16}/> Post Project
@@ -638,8 +660,8 @@ export default function VouchNetworkFeed() {
            </div>
 
            <div className="space-y-6">
-              {feedProjects.length > 0 ? (
-                feedProjects.map((proj) => (
+              {activeProjects.length > 0 ? (
+                activeProjects.map((proj) => (
                   <FeedCard 
                     key={proj.id} 
                     {...proj} 
@@ -654,7 +676,16 @@ export default function VouchNetworkFeed() {
                 ))
               ) : (
                 <div className="bg-[#151821] border border-white/5 rounded-3xl p-16 text-center">
-                  {searchQuery ? (<p className="text-gray-400 font-medium">No projects match "{searchQuery}" on the global network.</p>) : (<><RefreshCw size={32} className="text-gray-600 mx-auto mb-4 animate-spin" /><p className="text-gray-400 font-medium">Syncing global network...</p></>)}
+                  {feedFilter === 'following' ? (
+                     <>
+                        <Users size={32} className="text-gray-600 mx-auto mb-4" />
+                        <p className="text-gray-400 font-medium">You aren't following anyone yet, or they haven't posted.</p>
+                     </>
+                  ) : searchQuery ? (
+                     <p className="text-gray-400 font-medium">No projects match "{searchQuery}" on the global network.</p>
+                  ) : (
+                     <><RefreshCw size={32} className="text-gray-600 mx-auto mb-4 animate-spin" /><p className="text-gray-400 font-medium">Syncing global network...</p></>
+                  )}
                 </div>
               )}
            </div>
