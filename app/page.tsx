@@ -11,7 +11,7 @@ import {
   Search, Bell, MessageSquare, Flame, Clock, Filter, 
   CheckCircle2, MoreHorizontal, Sparkles, Trophy, 
   Github, LogOut, Heart, Plus, Zap, RefreshCw, ExternalLink, ArrowRight, Mail,
-  Edit2, X, Save, ImageIcon, Trash2, Users
+  Edit2, X, Save, ImageIcon, Trash2, Users, Globe
 } from 'lucide-react'
 import { signOut } from './actions'
 
@@ -48,8 +48,8 @@ export default function VouchNetworkFeed() {
   const [notifications, setNotifications] = useState([])
   const [unreadCount, setUnreadCount] = useState(0)
 
-  // --- NEW: Following State ---
-  const [feedFilter, setFeedFilter] = useState('global') // 'global' or 'following'
+  // --- NEW: Added 'trending' to the filter state ---
+  const [feedFilter, setFeedFilter] = useState('global') 
   const [followingIds, setFollowingIds] = useState([])
 
   const [email, setEmail] = useState('')
@@ -99,14 +99,12 @@ export default function VouchNetworkFeed() {
           const { data: myVouches } = await supabase.from('vouches').select('project_id').eq('voucher_id', currentUser.id)
           if (myVouches) setVouchedIds(myVouches.map(v => v.project_id))
 
-          // Fetch notifications
           const { data: notifs } = await supabase.from('notifications').select('*').eq('user_id', currentUser.id).order('created_at', { ascending: false }).limit(20)
           if (notifs) {
               setNotifications(notifs)
               setUnreadCount(notifs.filter(n => !n.is_read).length)
           }
 
-          // --- NEW: Fetch who the user is following ---
           const { data: myConnections } = await supabase.from('connections').select('following_id').eq('follower_id', currentUser.id)
           if (myConnections) {
               setFollowingIds(myConnections.map(c => c.following_id))
@@ -437,10 +435,17 @@ export default function VouchNetworkFeed() {
     )
   }
 
-  // --- NEW: Apply the "Following" filter to the active projects! ---
-  const activeProjects = feedFilter === 'following' 
-    ? feedProjects.filter(p => followingIds.includes(p.user_id))
-    : feedProjects;
+  // --- NEW: Calculate the active projects based on the 3 filters! ---
+  let activeProjects = feedProjects;
+  if (feedFilter === 'following') {
+    activeProjects = feedProjects.filter(p => followingIds.includes(p.user_id));
+  } else if (feedFilter === 'trending') {
+    activeProjects = [...feedProjects].sort((a, b) => {
+      const countA = globalVouchCounts[a.id] || 0;
+      const countB = globalVouchCounts[b.id] || 0;
+      return countB - countA;
+    });
+  }
 
   const topSkills = Object.entries(
     myProjects.reduce((acc, proj) => {
@@ -638,20 +643,26 @@ export default function VouchNetworkFeed() {
 
         <div className="col-span-1 lg:col-span-3 space-y-8">
            
-           {/* --- NEW: The Toggle Menu for Global vs Following --- */}
+           {/* --- NEW: The 3-Button Filter System --- */}
            <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-4">
               <div className="flex bg-[#151821] p-1.5 rounded-2xl border border-white/5 w-fit">
                 <button 
                   onClick={() => setFeedFilter('global')}
                   className={`flex items-center gap-2 px-6 py-2.5 rounded-xl text-sm font-semibold transition-all ${feedFilter === 'global' ? 'bg-[#232733] text-white shadow-sm border border-white/5' : 'text-gray-500 hover:text-gray-400'}`}
                 >
-                  <Flame size={16} className={feedFilter === 'global' ? 'text-orange-500' : ''}/> Global
+                  <Globe size={16} className={feedFilter === 'global' ? 'text-blue-500' : ''}/> Global
+                </button>
+                <button 
+                  onClick={() => setFeedFilter('trending')}
+                  className={`flex items-center gap-2 px-6 py-2.5 rounded-xl text-sm font-semibold transition-all ${feedFilter === 'trending' ? 'bg-[#232733] text-white shadow-sm border border-white/5' : 'text-gray-500 hover:text-gray-400'}`}
+                >
+                  <Flame size={16} className={feedFilter === 'trending' ? 'text-orange-500' : ''}/> Trending
                 </button>
                 <button 
                   onClick={() => setFeedFilter('following')}
                   className={`flex items-center gap-2 px-6 py-2.5 rounded-xl text-sm font-semibold transition-all ${feedFilter === 'following' ? 'bg-[#232733] text-white shadow-sm border border-white/5' : 'text-gray-500 hover:text-gray-400'}`}
                 >
-                  <Users size={16} className={feedFilter === 'following' ? 'text-blue-500' : ''}/> Following
+                  <Users size={16} className={feedFilter === 'following' ? 'text-purple-500' : ''}/> Following
                 </button>
               </div>
               <button onClick={() => setIsAddingProject(true)} className="lg:hidden flex items-center gap-2 px-5 py-2.5 bg-blue-600 rounded-2xl text-sm font-bold text-white transition-colors">
