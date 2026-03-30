@@ -30,7 +30,6 @@ function timeAgo(dateString) {
   return Math.floor(seconds) + " seconds ago";
 }
 
-// --- FIX 1: Renamed to ProfileContent so we can wrap it in Suspense below ---
 function ProfileContent() {
   const { id } = useParams()
   const [currentUser, setCurrentUser] = useState(null)
@@ -77,15 +76,29 @@ function ProfileContent() {
         const { data: followers } = await supabase.from('connections').select('follower_id').eq('following_id', id)
         if (followers) setFollowerCount(followers.length)
 
+        let tempProfile = null;
+
+        // 1. Try to load profile info from their published projects
         const { data: userProjects } = await supabase.from('projects').select('*').eq('user_id', id).order('created_at', { ascending: false })
         if (userProjects && userProjects.length > 0) {
           setProjects(userProjects)
-          setProfileUser({
+          tempProfile = {
             name: userProjects[0].author_name,
             avatar: userProjects[0].author_avatar,
             designation: userProjects[0].author_designation
-          })
+          }
         }
+
+        // 2. FIX: If they have NO projects, but it's YOUR profile, construct it from your active session!
+        if (!tempProfile && loggedInUser && loggedInUser.id === id) {
+           tempProfile = {
+             name: loggedInUser.user_metadata?.full_name || loggedInUser.user_metadata?.user_name || loggedInUser.email?.split('@')[0] || 'Network Builder',
+             avatar: loggedInUser.user_metadata?.avatar_url || 'https://www.gravatar.com/avatar/?d=mp',
+             designation: loggedInUser.user_metadata?.designation || 'Software Engineer'
+           }
+        }
+
+        setProfileUser(tempProfile)
       } catch (e) {
         console.error(e)
       } finally {
@@ -95,27 +108,23 @@ function ProfileContent() {
     loadProfile()
   }, [id])
 
-  // --- FIX 2: Connect Logic with Ghost Trap ---
   const handleConnect = async () => {
       if (!currentUser) return alert("You must be logged in to connect with builders!");
       
       try {
         if (isFollowing) {
-            // Unfollow
             setIsFollowing(false);
             setFollowerCount(prev => prev - 1);
             
             const { error } = await supabase.from('connections').delete().match({ follower_id: currentUser.id, following_id: id });
             if (error) throw error;
         } else {
-            // Follow
             setIsFollowing(true);
             setFollowerCount(prev => prev + 1);
             
             const { data, error } = await supabase.from('connections').insert([{ follower_id: currentUser.id, following_id: id }]).select();
             if (error) throw error;
 
-            // THE GHOST TRAP
             if (!data || data.length === 0) {
                 alert("Save Blocked! Please go to Supabase -> Table Editor -> 'connections' -> and turn OFF Row Level Security (RLS).");
                 setIsFollowing(false);
@@ -159,11 +168,11 @@ function ProfileContent() {
   if (!profileUser) return (
     <div className="min-h-screen bg-[#0A0D14] flex flex-col items-center justify-center p-4">
        <h1 className="text-2xl font-bold text-white mb-4">Profile Not Found</h1>
-       <Link href="/" className="text-blue-500 hover:text-blue-400 flex items-center gap-2"><ArrowLeft size={16}/> Back to Home</Link>
+       <p className="text-sm text-gray-500 mb-6">This builder hasn't published anything yet.</p>
+       <Link href="/" className="text-blue-500 hover:text-blue-400 flex items-center gap-2"><ArrowLeft size={16}/> Back to Network</Link>
     </div>
   )
 
-  // --- FIX 3: Iterate through ALL skills for the leaderboard ---
   const topSkills = Object.entries(
     projects.reduce((acc, proj) => {
       const skillsList = (proj.skills && proj.skills.length > 0) ? proj.skills : [proj.tag || 'Protocol'];
@@ -192,32 +201,32 @@ function ProfileContent() {
         </div>
       </nav>
 
-      <div className="max-w-[1000px] mx-auto px-4 md:px-8 pt-12 pb-20">
+      <div className="max-w-[1000px] mx-auto px-4 md:px-8 pt-8 md:pt-12 pb-20">
         
-        <div className="bg-[#151821] border border-white/5 rounded-[2.5rem] p-8 md:p-12 mb-12 relative overflow-hidden flex flex-col md:flex-row items-center md:items-start gap-8">
+        <div className="bg-[#151821] border border-white/5 rounded-[2rem] md:rounded-[2.5rem] p-6 md:p-12 mb-8 md:mb-12 relative overflow-hidden flex flex-col md:flex-row items-center md:items-start gap-6 md:gap-8">
            <div className="absolute top-0 right-0 w-96 h-96 bg-blue-600/10 blur-[100px] rounded-full pointer-events-none -translate-y-1/2 translate-x-1/3" />
            
-           <div className="w-32 h-32 md:w-40 md:h-40 rounded-full border-4 border-[#0A0D14] shadow-2xl relative z-10 overflow-hidden shrink-0">
+           <div className="w-28 h-28 md:w-40 md:h-40 rounded-full border-4 border-[#0A0D14] shadow-2xl relative z-10 overflow-hidden shrink-0">
               <img src={profileUser.avatar || 'https://www.gravatar.com/avatar/?d=mp'} className="w-full h-full object-cover" alt="Profile" />
            </div>
            
            <div className="flex-1 text-center md:text-left z-10 w-full">
               <div className="flex flex-col md:flex-row md:items-center gap-3 mb-2 justify-center md:justify-start">
-                 <h1 className="text-3xl md:text-4xl font-black text-white tracking-tight">{profileUser.name}</h1>
+                 <h1 className="text-2xl md:text-4xl font-black text-white tracking-tight">{profileUser.name}</h1>
                  <div className="flex items-center justify-center gap-1.5 px-3 py-1 bg-blue-500/10 rounded-full border border-blue-500/20 w-fit mx-auto md:mx-0"><CheckCircle2 size={14} className="text-blue-400" /><span className="text-[10px] font-bold text-blue-400 uppercase tracking-wide">Verified Builder</span></div>
               </div>
-              <p className="text-lg text-gray-400 mb-6">{profileUser.designation}</p>
+              <p className="text-base md:text-lg text-gray-400 mb-6">{profileUser.designation}</p>
               
-              <div className="flex flex-col sm:flex-row items-center justify-center md:justify-start gap-6 border-t border-white/5 pt-6 w-full">
-                 <div className="flex gap-6">
-                    <div><p className="text-2xl font-bold text-white">{projects.length}</p><p className="text-xs text-gray-500 uppercase tracking-wider font-bold">Projects</p></div>
-                    <div><p className="text-2xl font-bold text-blue-400">{Object.values(globalVouchCounts).reduce((a, b) => a + b, 0)}</p><p className="text-xs text-gray-500 uppercase tracking-wider font-bold">Vouches</p></div>
-                    <div><p className="text-2xl font-bold text-purple-400">{followerCount}</p><p className="text-xs text-gray-500 uppercase tracking-wider font-bold">Followers</p></div>
+              <div className="flex flex-col sm:flex-row items-center justify-center md:justify-start gap-4 md:gap-6 border-t border-white/5 pt-6 w-full">
+                 <div className="flex gap-6 w-full sm:w-auto justify-center">
+                    <div className="text-center sm:text-left"><p className="text-xl md:text-2xl font-bold text-white">{projects.length}</p><p className="text-[10px] md:text-xs text-gray-500 uppercase tracking-wider font-bold">Projects</p></div>
+                    <div className="text-center sm:text-left"><p className="text-xl md:text-2xl font-bold text-blue-400">{Object.values(globalVouchCounts).reduce((a, b) => a + b, 0)}</p><p className="text-[10px] md:text-xs text-gray-500 uppercase tracking-wider font-bold">Vouches</p></div>
+                    <div className="text-center sm:text-left"><p className="text-xl md:text-2xl font-bold text-purple-400">{followerCount}</p><p className="text-[10px] md:text-xs text-gray-500 uppercase tracking-wider font-bold">Followers</p></div>
                  </div>
                  
                  {currentUser && currentUser.id !== id && (
-                    <div className="sm:ml-auto">
-                      <button onClick={handleConnect} className={`px-6 py-3 rounded-xl font-bold text-sm flex items-center gap-2 transition-all shadow-lg ${isFollowing ? 'bg-white/10 text-white hover:bg-red-500/20 hover:text-red-400 hover:border-red-500/30 shadow-none border border-transparent' : 'bg-blue-600 text-white hover:bg-blue-500 shadow-blue-600/20'}`}>
+                    <div className="sm:ml-auto w-full sm:w-auto mt-4 sm:mt-0">
+                      <button onClick={handleConnect} className={`w-full sm:w-auto justify-center px-6 py-3 rounded-xl font-bold text-sm flex items-center gap-2 transition-all shadow-lg ${isFollowing ? 'bg-white/10 text-white hover:bg-red-500/20 hover:text-red-400 hover:border-red-500/30 shadow-none border border-transparent' : 'bg-blue-600 text-white hover:bg-blue-500 shadow-blue-600/20'}`}>
                         {isFollowing ? <><Check size={16}/> Following</> : <><UserPlus size={16}/> Connect</>}
                       </button>
                     </div>
@@ -229,7 +238,7 @@ function ProfileContent() {
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
            
            <div className="lg:col-span-1">
-             <div className="bg-[#151821] rounded-3xl p-6 border border-white/5 sticky top-24">
+             <div className="bg-[#151821] rounded-3xl p-6 border border-white/5 sticky top-24 hidden lg:block">
                 <div className="flex items-center gap-3 mb-6">
                    <div className="p-2.5 bg-purple-500/10 rounded-xl"><Trophy size={18} className="text-purple-400" /></div>
                    <h3 className="font-bold text-white tracking-tight">Top Vouched Skills</h3>
@@ -286,27 +295,27 @@ function ProfileContent() {
 
 function ProfileProjectCard({ id, title, tag, skills, desc, link, vouchCount, onVouch, vouched, created_at, image_url, currentUser }) {
   return (
-    <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} className="bg-[#151821] border border-white/5 rounded-[2rem] p-6 sm:p-8 hover:border-white/10 transition-colors shadow-xl shadow-black/50">
+    <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} className="bg-[#151821] border border-white/5 rounded-[2rem] p-5 sm:p-8 hover:border-white/10 transition-colors shadow-xl shadow-black/50">
       <div className="flex justify-between items-start mb-4">
-         <h2 className="text-2xl font-bold text-white tracking-tight">{title}</h2>
-         <span className="text-[10px] font-bold text-gray-500 uppercase tracking-wider">{timeAgo(created_at)}</span>
+         <h2 className="text-xl sm:text-2xl font-bold text-white tracking-tight">{title}</h2>
+         <span className="text-[10px] font-bold text-gray-500 uppercase tracking-wider shrink-0 ml-2">{timeAgo(created_at)}</span>
       </div>
       
-      <p className="text-gray-400 text-sm leading-relaxed mb-6 whitespace-pre-line">{desc}</p>
+      <p className="text-gray-400 text-xs sm:text-sm leading-relaxed mb-6 whitespace-pre-line">{desc}</p>
 
       <div className="flex items-center gap-2 mb-8 flex-wrap">
           {skills && skills.length > 0 ? (
-              skills.map((skill, index) => (<span key={index} className="px-3 py-1 bg-white/5 border border-white/5 rounded-full text-xs text-gray-300 font-medium">{skill}</span>))
-          ) : (<span className="px-3 py-1 bg-white/5 border border-white/5 rounded-full text-xs text-gray-300 font-medium">{tag || 'Architecture'}</span>)}
+              skills.map((skill, index) => (<span key={index} className="px-3 py-1 bg-white/5 border border-white/5 rounded-full text-[10px] sm:text-xs text-gray-300 font-medium">{skill}</span>))
+          ) : (<span className="px-3 py-1 bg-white/5 border border-white/5 rounded-full text-[10px] sm:text-xs text-gray-300 font-medium">{tag || 'Architecture'}</span>)}
       </div>
 
-      <div className="relative group overflow-hidden rounded-2xl mb-6 border border-white/5 bg-[#0A0D14] min-h-[200px]">
+      <div className="relative group overflow-hidden rounded-2xl mb-6 border border-white/5 bg-[#0A0D14] min-h-[160px] sm:min-h-[200px]">
           <a href={link || '#'} target={link ? "_blank" : "_self"} rel="noopener noreferrer" className={`block relative h-full ${!link && 'cursor-default'}`}>
              <div className="absolute inset-0 bg-gradient-to-t from-[#0A0D14] to-transparent z-10 opacity-60 group-hover:opacity-40 transition-opacity" />
              {image_url ? (
-                <img src={image_url} alt={title} className="w-full h-full object-cover rounded-2xl h-56 sm:h-72" />
+                <img src={image_url} alt={title} className="w-full h-full object-cover rounded-2xl h-48 sm:h-72" />
              ) : (
-                 <div className="w-full h-56 sm:h-72 bg-gradient-to-br from-blue-900/20 via-[#151821] to-purple-900/20 flex flex-col items-center justify-center relative overflow-hidden">
+                 <div className="w-full h-48 sm:h-72 bg-gradient-to-br from-blue-900/20 via-[#151821] to-purple-900/20 flex flex-col items-center justify-center relative overflow-hidden">
                     <div className="absolute w-[400px] h-[400px] bg-blue-500/10 blur-[100px] rounded-full -top-1/2 -left-1/4 group-hover:bg-blue-500/20 transition-colors duration-700" />
                     <Sparkles size={32} className="text-white/10 mb-3 z-20" />
                     <span className="font-mono text-white/20 text-2xl font-black tracking-widest uppercase z-20">{title.substring(0, 3)}</span>
@@ -333,7 +342,6 @@ function ProfileProjectCard({ id, title, tag, skills, desc, link, vouchCount, on
   )
 }
 
-// --- THIS IS THE PROPER SUSPENSE WRAPPER ---
 export default function PublicProfile() {
   return (
     <Suspense fallback={<div className="h-screen bg-[#0A0D14] flex items-center justify-center text-blue-500 animate-pulse font-bold text-2xl">Loading Profile...</div>}>
