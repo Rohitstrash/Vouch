@@ -38,7 +38,6 @@ export default function VouchNetworkFeed() {
   const [loading, setLoading] = useState(true)
   const [isSyncing, setIsSyncing] = useState(false)
   
-  // --- NEW: Split states for Feed vs Sidebar ---
   const [feedProjects, setFeedProjects] = useState([])
   const [myProjects, setMyProjects] = useState([])
   const [isSearching, setIsSearching] = useState(false)
@@ -125,9 +124,39 @@ export default function VouchNetworkFeed() {
     initializeProtocol()
   }, [])
 
-  // --- NEW: Global Debounced Database Search ---
+  // --- NEW: The WebSocket Realtime Listener! ---
   useEffect(() => {
-    // Prevent search from running during the initial page load
+    if (!user?.id) return;
+
+    // Subscribe to INSERT events on the notifications table for THIS user
+    const channel = supabase
+      .channel('realtime-notifications')
+      .on(
+        'postgres_changes',
+        {
+          event: 'INSERT',
+          schema: 'public',
+          table: 'notifications',
+          filter: `user_id=eq.${user.id}`, // Only listen for notifications meant for me
+        },
+        (payload) => {
+          // When a new notification hits the database, instantly update the UI!
+          const newNotif = payload.new;
+          setNotifications((prev) => [newNotif, ...prev]);
+          setUnreadCount((prev) => prev + 1);
+          
+          // Optional: You could even trigger a browser sound or toast here!
+        }
+      )
+      .subscribe();
+
+    // Cleanup the subscription when the component unmounts
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [user?.id, supabase]);
+
+  useEffect(() => {
     if (loading || isSyncing || !user) return;
 
     const delayDebounceFn = setTimeout(async () => {
@@ -135,7 +164,6 @@ export default function VouchNetworkFeed() {
       
       let dbQuery = supabase.from('projects').select('*').order('created_at', { ascending: false });
       
-      // If user typed something, add the 'OR' filter to search multiple columns globally
       if (searchQuery.trim() !== '') {
          dbQuery = dbQuery.or(`title.ilike.%${searchQuery}%,author_name.ilike.%${searchQuery}%,tag.ilike.%${searchQuery}%,desc.ilike.%${searchQuery}%`);
       }
@@ -146,7 +174,7 @@ export default function VouchNetworkFeed() {
          setFeedProjects(data);
       }
       setIsSearching(false);
-    }, 400); // Wait 400ms after user stops typing before hitting the database
+    }, 400); 
 
     return () => clearTimeout(delayDebounceFn);
   }, [searchQuery, user, loading, isSyncing]);
@@ -487,7 +515,6 @@ export default function VouchNetworkFeed() {
           <span className="text-xl font-bold tracking-tight hidden md:block">Vouch</span>
         </div>
 
-        {/* --- NEW: Global Loading Spinner for Search --- */}
         <div className="hidden md:flex items-center bg-[#151821] rounded-full px-5 py-2.5 w-[500px] border border-white/5 focus-within:border-blue-500/50 transition-colors">
            {isSearching ? (
              <RefreshCw size={18} className="text-blue-500 mr-3 animate-spin" />
@@ -611,7 +638,6 @@ export default function VouchNetworkFeed() {
            </div>
 
            <div className="space-y-6">
-              {/* --- NEW: Map over feedProjects directly! --- */}
               {feedProjects.length > 0 ? (
                 feedProjects.map((proj) => (
                   <FeedCard 
