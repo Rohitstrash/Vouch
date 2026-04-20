@@ -342,7 +342,8 @@ function ProfileProjectCard({ id, title, tag, skills, desc, link, vouchCount, on
   )
 }
 
-export default function PublicProfile() {
+// This ensures Next.js can build the dynamic route properly
+export default function ProfilePage() {
   return (
     <Suspense fallback={<div className="h-screen bg-[#0A0D14] flex items-center justify-center text-blue-500 animate-pulse font-bold text-2xl">Loading Profile...</div>}>
       <ProfileContent />
