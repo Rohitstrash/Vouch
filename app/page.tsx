@@ -11,9 +11,11 @@ import {
   Search, Bell, MessageSquare, Flame, Clock, Filter, 
   CheckCircle2, MoreHorizontal, Sparkles, Trophy, 
   Github, LogOut, Heart, Plus, Zap, RefreshCw, ExternalLink, ArrowRight, Mail,
-  Edit2, X, Save, ImageIcon, Trash2, Users, Globe, User
+  Edit2, X, Save, ImageIcon, Trash2, Users, Globe, User, Wand2
 } from 'lucide-react'
 import { signOut } from './actions'
+// --- ELEMENT 1: AI IMPORT ---
+import { GoogleGenerativeAI } from "@google/generative-ai"
 
 function timeAgo(dateString) {
   if (!dateString) return "Unknown time";
@@ -67,6 +69,39 @@ export default function VouchNetworkFeed() {
 
   const [isAddingProject, setIsAddingProject] = useState(false)
   const [newProjectForm, setNewProjectForm] = useState({ title: '', desc: '', link: '', tag: '', image_url: '' })
+
+  // --- ELEMENT 2: AI LOGIC STATES & FUNCTION ---
+  const [isAiLoading, setIsAiLoading] = useState(false)
+
+  const handleAiOptimize = async () => {
+    if (!newProjectForm.desc || newProjectForm.desc.length < 10) {
+      alert("Write a few words about your project first!");
+      return;
+    }
+    
+    setIsAiLoading(true);
+    try {
+      const genAI = new GoogleGenerativeAI(process.env.NEXT_PUBLIC_GEMINI_API_KEY);
+      const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
+
+      const prompt = `Rewrite this project description to be professional, technical, and architecturally focused. 
+      Also, suggest the best technology tag (e.g. React, Python, Solidity) for it.
+      Return ONLY a JSON object: {"newDesc": "rewritten text", "suggestedTag": "Tag"}
+      User input: ${newProjectForm.desc}`;
+
+      const result = await model.generateContent(prompt);
+      const response = await result.response;
+      const text = response.text().replace(/```json|```/gi, "").trim();
+      const data = JSON.parse(text);
+
+      setNewProjectForm({ ...newProjectForm, desc: data.newDesc, tag: data.suggestedTag });
+    } catch (error) {
+      alert("AI is busy! Check your API key in .env.local");
+      console.error(error);
+    } finally {
+      setIsAiLoading(false);
+    }
+  };
 
   const supabase = createBrowserClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL || '',
@@ -498,6 +533,17 @@ export default function VouchNetworkFeed() {
                 <div>
                   <label className="text-xs font-bold text-gray-400 uppercase tracking-wider mb-2 block">Description <span className="text-red-500">*</span></label>
                   <textarea required value={newProjectForm.desc} onChange={(e) => setNewProjectForm({...newProjectForm, desc: e.target.value})} placeholder="What did you build? What problem does it solve?" rows={3} className="w-full bg-[#0A0D14] border border-white/10 rounded-xl px-4 py-3 text-sm text-white outline-none focus:border-blue-500 resize-none" />
+                  
+                  {/* --- ELEMENT 3: MAGIC AI BUTTON --- */}
+                  <button 
+                      type="button"
+                      onClick={handleAiOptimize}
+                      disabled={isAiLoading}
+                      className="mt-2 bg-gradient-to-r from-purple-600 to-blue-600 hover:from-purple-500 hover:to-blue-500 text-white px-4 py-2 rounded-xl text-xs font-black flex items-center gap-2 shadow-xl disabled:opacity-50 transition-all active:scale-95"
+                  >
+                      {isAiLoading ? <RefreshCw size={14} className="animate-spin" /> : <Wand2 size={14} />}
+                      {isAiLoading ? "Optimizing..." : "Magic Rewrite"}
+                  </button>
                 </div>
                 <div>
                   <label className="text-xs font-bold text-gray-400 uppercase tracking-wider mb-2 block">External Link</label>
